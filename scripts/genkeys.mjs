@@ -9,7 +9,7 @@ const text = existsSync(ENV) ? readFileSync(ENV, 'utf8') : '';
 const has = (k) => new RegExp('^' + k + '=.+', 'm').test(text);
 
 const out = {};
-for (const k of ['DEPLOYER_EVM_KEY', 'DESK_EVM_KEY', 'DESK_BCH_KEY']) {
+for (const k of ['DEPLOYER_EVM_KEY', 'DESK_EVM_KEY', 'DESK_BCH_KEY', 'TEST_USER_EVM_KEY', 'TEST_USER_BCH_KEY']) {
   if (has(k)) continue;
   const hex = randomBytes(32).toString('hex');
   const line = k + '=' + (k.endsWith('EVM_KEY') ? '0x' : '') + hex + '\n';
@@ -22,4 +22,6 @@ console.log(JSON.stringify({
   deployerEvm: privateKeyToAccount(env.DEPLOYER_EVM_KEY).address,
   deskEvm: privateKeyToAccount(env.DESK_EVM_KEY).address,
   deskBch: addressesOf(env.DESK_BCH_KEY),
+  testUserEvm: privateKeyToAccount(env.TEST_USER_EVM_KEY).address,
+  testUserBch: addressesOf(env.TEST_USER_BCH_KEY),
 }, null, 2));
