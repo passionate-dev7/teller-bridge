@@ -9,7 +9,7 @@ const root = new URL('..', import.meta.url).pathname;
 const work = mkdtempSync(join(tmpdir(), 'desk-mut-'));
 for (const d of ['desk', 'lib', 'contracts', 'test', 'package.json']) cpSync(join(root, d), join(work, d), { recursive: true, filter: (p) => !p.includes('/contracts/evm/lib') && !p.includes('/contracts/evm/out') });
 symlinkSync(join(root, 'node_modules'), join(work, 'node_modules'));
-const FILES = { engine: join(work, 'desk/engine.js'), client: join(work, 'lib/client.js') };
+const FILES = { engine: join(work, 'desk/engine.js'), client: join(work, 'lib/client.js'), bch: join(work, 'lib/bch.js'), wizard: join(work, 'lib/wizard.js') };
 const originals = Object.fromEntries(Object.entries(FILES).map(([k, f]) => [k, readFileSync(f, 'utf8')]));
 
 const M = [
@@ -37,6 +37,9 @@ const M = [
   ['quotes never expire', "if (s.state === 'quoted' && now > s.quoteExpiry) return this.#move(s, 'expired');", ''],
   ['hashlock reuse allowed', "if (this.store.byHashlock(hashlock)) throw", 'if (false) throw'],
   ['minimum swap not enforced', "if (cents < minCents)", 'if (false)'],
+  ['wallet transactions priced below the relay minimum fee rate', "export const FEE_RATE = 1.2;", 'export const FEE_RATE = 0.5;', 'bch'],
+  ['wallet is asked to sign without the token data of its coins', "const sourceOutputs = wc.sourceOutputs.map((so) => sourceOutputToRelay(so));", 'const sourceOutputs = wc.sourceOutputs.map((so) => sourceOutputToRelay({ ...so, token: undefined }));', 'wizard'],
+  ['wallet signs inputs it cannot map to its own paths', "if (!m) throw new Error('input ' + n + ' is not a coin of the connected wallet');", '', 'wizard'],
   ['client accepts a different hashlock', "if (q.hashlock !== req.hashlock) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a different send amount', "if (q.sendUnits !== String(req.sendUnits)) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a refund or recipient script that is not the wallet', "if (q.userBchLock !== req.userBchLock) bad.push", 'if (false) bad.push', 'client'],
@@ -49,7 +52,7 @@ const M = [
 ];
 
 const rows = [];
-const run = () => spawnSync('node', ['--test', 'test/desk.test.js', 'test/client.test.js'], { cwd: work, encoding: 'utf8' });
+const run = () => spawnSync('node', ['--test', 'test/desk.test.js', 'test/client.test.js', 'test/wizard.test.js'], { cwd: work, encoding: 'utf8' });
 const base = run();
 rows.push({ mutant: 'ORIGINAL', verdict: base.status === 0 ? 'green' : 'RED (unexpected)', failed: '' });
 for (const [name, from, to, which = 'engine'] of M) {

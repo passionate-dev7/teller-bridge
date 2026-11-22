@@ -1,0 +1,10 @@
+[
+  {
+    "label": "refund path A (PUSD to USDC, user vanished): desk took its USDC back on the Base leg, then relayed the BCH refund to the user (30 units back to the user)",
+    "txid": "4e300792f2855866e6345a235ff50b125dd7e354f5518b8643e71423375784d7"
+  },
+  {
+    "label": "refund path B (USDC to PUSD, user vanished): desk took its PUSD back after the BCH refund time (29 units back to the desk), then relayed the Base refund to the user",
+    "txid": "74545e7178835d49abff81a948913c566516357b766ce35f9ab16418df9ecdff"
+  }
+]
