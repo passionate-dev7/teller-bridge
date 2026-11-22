@@ -19,9 +19,10 @@ async function quoteOf(dir) {
   if (dir === 'bch2base') q.bchLockAddress = r.user.bchContract(q).tokenAddress;
   const status = JSON.parse(JSON.stringify(await r.desk.status()));
   const now = Math.floor(Date.now() / 1000);
-  return { r, q: JSON.parse(JSON.stringify(q)), req: { ...req, userBchLock: lockingBytecodeOf(r.user.bch.chipnet) }, status, now };
+  const pin = { chainId: status.evm.chainId, deskLock: r.deskLock, token: r.token, deskEvm: r.evm.address, deskBchLock: r.bch.lockingHex };
+  return { r, q: JSON.parse(JSON.stringify(q)), req: { ...req, userBchLock: lockingBytecodeOf(r.user.bch.chipnet) }, status, now, pin };
 }
-const check = ({ r, q, req, status, now }, tweak = (x) => x) => checkQuote(tweak({ ...q }), req, status, now, r.chain);
+const check = ({ r, q, req, status, now, pin }, tweak = (x) => x) => checkQuote(tweak({ ...q }), req, status, now, r.chain, pin);
 
 test('an honest quote passes in both directions', async () => {
   for (const dir of ['bch2base', 'base2bch']) assert.deepEqual(check(await quoteOf(dir)), [], dir);
@@ -60,6 +61,6 @@ test('a desk that swapped its own script into the lock is caught by deriving the
   const c = await quoteOf('bch2base');
   // the desk claims the lock pays the desk, but the status it publishes names a different desk script
   const status = { ...c.status, bch: { ...c.status.bch, deskLock: '76a914' + '11'.repeat(20) + '88ac' } };
-  const problems = checkQuote({ ...c.q }, c.req, status, c.now, c.r.chain);
+  const problems = checkQuote({ ...c.q }, c.req, status, c.now, c.r.chain, c.pin);
   assert.match(problems.join(), /derived from the terms/);
 });

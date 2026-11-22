@@ -8,5 +8,6 @@ export default defineConfig({
   plugins: [react()],
   define: { global: 'globalThis' },
   build: { outDir: 'dist', emptyOutDir: true, target: 'es2022', chunkSizeWarningLimit: 1800 },
-  resolve: { alias: { buffer: 'buffer/' } },
+  // the desk this build pins: deployments.json, or the file named by DEPLOYMENTS_FILE (local rehearsals)
+  resolve: { alias: { buffer: 'buffer/', 'pinned-deployments': process.env.DEPLOYMENTS_FILE || fileURLToPath(new URL('../deployments.json', import.meta.url)) } },
 });

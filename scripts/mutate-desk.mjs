@@ -40,6 +40,21 @@ const M = [
   ['wallet transactions priced below the relay minimum fee rate', "export const FEE_RATE = 1.2;", 'export const FEE_RATE = 0.5;', 'bch'],
   ['wallet is asked to sign without the token data of its coins', "const sourceOutputs = wc.sourceOutputs.map((so) => sourceOutputToRelay(so));", 'const sourceOutputs = wc.sourceOutputs.map((so) => sourceOutputToRelay({ ...so, token: undefined }));', 'wizard'],
   ['wallet signs inputs it cannot map to its own paths', "if (!m) throw new Error('input ' + n + ' is not a coin of the connected wallet');", '', 'wizard'],
+  ['reveal gate: no check that the desk's Base lock is open', "if (l.state !== LOCK_STATE.Open) return no('no open lock on Base');", '', 'client'],
+  ['reveal gate: lock may be made by anyone', "if (l.sender.toLowerCase() !== pin.deskEvm.toLowerCase()) return no('lock was not made by the desk account');", '', 'client'],
+  ['reveal gate: lock may pay another recipient', "if (l.recipient.toLowerCase() !== swap.userEvm.toLowerCase()) return no('lock does not pay your address');", '', 'client'],
+  ['reveal gate: lock may hold less than the quote', "if (BigInt(l.amount) !== recv) return no('lock holds a different amount');", '', 'client'],
+  ['reveal gate: lock may use another hashlock', "if (l.hashlock.toLowerCase() !== '0x' + swap.hashlock) return no('lock uses a different hashlock');", '', 'client'],
+  ['reveal gate: Base lock may outlive the BCH refund margin', "if (l.timeout > swap.bchRefundTime - status.windows.overlap) return no('lock outlives the margin before your BCH refund opens');", '', 'client'],
+  ['reveal gate: Base lock may be about to expire', "if (l.timeout - now < REVEAL_MARGIN) return no('lock is too close to expiry to claim in time');", '', 'client'],
+  ['reveal gate: BCH refund may open right before the Base refund', "if (swap.bchRefundTime > swap.evmTimeout - status.windows.evmOverlap) return no('BCH refund opens too close to your Base refund');", '', 'client'],
+  ['reveal gate: BCH lock may be unconfirmed', "if ((await reads.confirmations(u.txid)) < 1) return no('BCH lock is not confirmed yet');", '', 'client'],
+  ['reveal gate: BCH lock may be for less than the quote', "x.token.amount >= recv &&", 'true &&', 'client'],
+  ['pin: a different DeskLock is accepted', "if (!eq(status.evm.deskLock, pin.deskLock)) bad.push", 'if (false) bad.push', 'client'],
+  ['pin: a different token is accepted', "if (!eq(status.evm.token, pin.token)) bad.push", 'if (false) bad.push', 'client'],
+  ['pin: a different desk account is accepted', "if (!eq(status.evm.deskAddress, pin.deskEvm)) bad.push", 'if (false) bad.push', 'client'],
+  ['pin: a different BCH desk script is accepted', "if (!eq(status.bch.deskLock, pin.deskBchLock)) bad.push", 'if (false) bad.push', 'client'],
+  ['pin: an unpinned build trusts the server', "if (!pin) return ['this build has no pinned desk for chain ' + status?.evm?.chainId];", '', 'client'],
   ['client accepts a different hashlock', "if (q.hashlock !== req.hashlock) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a different send amount', "if (q.sendUnits !== String(req.sendUnits)) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a refund or recipient script that is not the wallet', "if (q.userBchLock !== req.userBchLock) bad.push", 'if (false) bad.push', 'client'],
@@ -52,7 +67,7 @@ const M = [
 ];
 
 const rows = [];
-const run = () => spawnSync('node', ['--test', 'test/desk.test.js', 'test/client.test.js', 'test/wizard.test.js'], { cwd: work, encoding: 'utf8' });
+const run = () => spawnSync('node', ['--test', 'test/desk.test.js', 'test/client.test.js', 'test/wizard.test.js', 'test/security.test.js'], { cwd: work, encoding: 'utf8' });
 const base = run();
 rows.push({ mutant: 'ORIGINAL', verdict: base.status === 0 ? 'green' : 'RED (unexpected)', failed: '' });
 for (const [name, from, to, which = 'engine'] of M) {

@@ -17,7 +17,7 @@ try {
   const a = randomSecret();
   const reqA = { dir: 'bch2base', pair: 'PUSD', sendUnits: '30', hashlock: a.hashlock, userBchAddress: userBchAddr, userEvm: userEvm.account.address };
   const qA = await api.quote(reqA);
-  if (checkQuote(qA, { ...reqA, userBchLock }, await api.status(), Math.floor(Date.now() / 1000), chain).length) throw new Error('quote A');
+  if (checkQuote(qA, { ...reqA, userBchLock }, await api.status(), Math.floor(Date.now() / 1000), chain, R.pin).length) throw new Error('quote A');
   const lockA = await lockBuilder({ provider: chain, contract: bchContractFromQuote(qA, await api.status(), chain), category, tokenAmount: 30n, inputs: await addressInputs(chain, userBchAddr, { keyHex: env.TEST_USER_BCH_KEY }), changeTo: R.userA[net.bch.network === 'mainnet' ? 'mainnetTokens' : 'chipnetTokens'] }).send();
   log('A user locked 0.30 PUSD', lockA.txid, 'refund time', qA.bchRefundTime);
 
@@ -25,7 +25,7 @@ try {
   const b = randomSecret();
   const reqB = { dir: 'base2bch', pair: 'PUSD', sendUnits: '300000', hashlock: b.hashlock, userBchAddress: userBchAddr, userEvm: userEvm.account.address };
   const qB = await api.quote(reqB);
-  if (checkQuote(qB, { ...reqB, userBchLock }, await api.status(), Math.floor(Date.now() / 1000), chain).length) throw new Error('quote B');
+  if (checkQuote(qB, { ...reqB, userBchLock }, await api.status(), Math.floor(Date.now() / 1000), chain, R.pin).length) throw new Error('quote B');
   const w = userEvm.walletClient, p = userEvm.publicClient;
   await p.waitForTransactionReceipt({ hash: await w.writeContract({ address: token, abi: ERC20_ABI, functionName: 'approve', args: [desk.evm.deskLock, 300000n] }) });
   const lockB = await w.writeContract({ address: desk.evm.deskLock, abi: DESK_LOCK_ABI, functionName: 'lock', args: [desk.evm.address, '0x' + b.hashlock, BigInt(qB.evmTimeout), 300000n] });

@@ -16,7 +16,7 @@ try {
     const before = { usdc: await userUsdc(), deskTokens: await desk.bch.tokenBalance(category) };
     const req = { dir: 'bch2base', pair: 'PUSD', sendUnits, hashlock, userBchAddress: userBchAddr, userEvm: userEvm.account.address };
     const q = await api.quote(req);
-    const problems = checkQuote(q, { ...req, userBchLock }, await api.status(), Math.floor(Date.now() / 1000), chain);
+    const problems = checkQuote(q, { ...req, userBchLock }, await api.status(), Math.floor(Date.now() / 1000), chain, R.pin);
     if (problems.length) throw new Error('quote check: ' + problems.join('; '));
     const t0 = Date.now();
     const contract = bchContractFromQuote(q, await api.status(), chain);
@@ -44,7 +44,7 @@ try {
     const before = { tokens: await tokensOf(userBchAddr), deskUsdc: await desk.evm.usdcBalance() };
     const req = { dir: 'base2bch', pair: 'PUSD', sendUnits, hashlock, userBchAddress: userBchAddr, userEvm: userEvm.account.address };
     const q = await api.quote(req);
-    const problems = checkQuote(q, { ...req, userBchLock }, await api.status(), Math.floor(Date.now() / 1000), chain);
+    const problems = checkQuote(q, { ...req, userBchLock }, await api.status(), Math.floor(Date.now() / 1000), chain, R.pin);
     if (problems.length) throw new Error('quote check: ' + problems.join('; '));
     const t0 = Date.now();
     const w = userEvm.walletClient, p = userEvm.publicClient;

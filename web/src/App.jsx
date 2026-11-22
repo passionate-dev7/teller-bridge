@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isAddress } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { deskApi } from '../../lib/client.js';
+import { deskApi, readyToReveal } from '../../lib/client.js';
 import { bchToBaseOut, baseToBchOut } from '../../lib/amounts.js';
 import { lockingBytecodeOf } from '../../lib/bch.js';
 import { DESK_URL } from './config.js';
@@ -12,6 +12,7 @@ import Drawers from './Drawers.jsx';
 import Receipt from './Receipt.jsx';
 import PairDialog from './PairDialog.jsx';
 import Overflow from './Overflow.jsx';
+import { makeReads } from './reads.js';
 
 const TERMINAL = ['done', 'refunded', 'expired', 'abandoned'];
 const hours = (s) => (s % 3600 === 0 ? s / 3600 + ' h' : Math.round(s / 60) + ' min');
@@ -49,6 +50,9 @@ export default function App() {
   const [swap, setSwap] = useState(null);
   const [past, setPast] = useState([]);
   const [replayOf, setReplayOf] = useState(null);
+  const [revealNote, setRevealNote] = useState(null);
+  const statusRef = useRef(null);
+  statusRef.current = status;
   const [peg, setPeg] = useState(null);
   useEffect(() => { api.peg().then(setPeg).catch(() => setPeg(null)); }, [api]);
 
@@ -74,7 +78,7 @@ export default function App() {
     if (!status || track) return;
     const rec = saved().find((r) => r.id);
     if (!rec) return;
-    api.swap(rec.id).then((s) => { if (!TERMINAL.includes(s.state)) { setTrack({ id: rec.id, secret: rec.secret, userLockTx: rec.userLockTx, dir: rec.dir, startedAt: rec.at }); setSwap(s); } }).catch(() => {});
+    api.swap(rec.id).then((s) => { if (!TERMINAL.includes(s.state)) { setTrack({ id: rec.id, secret: rec.secret, userLockTx: rec.userLockTx, dir: rec.dir, startedAt: rec.at, expect: rec.expect }); setSwap(s); } }).catch(() => {});
   }, [status?.network]);
 
   // follow the active swap, hand the secret over once the desk has locked its side
@@ -86,7 +90,12 @@ export default function App() {
         let s = await api.swap(track.id);
         if (s.state === 'desk_locked' && !s.secretRevealed && track.secret && !revealing) {
           revealing = true;
-          try { s = await api.reveal(track.id, track.secret); } catch { /* retried on the next poll */ } finally { revealing = false; }
+          try {
+            // the desk's word is not enough: read its lock on chain ourselves before the secret leaves this tab
+            const reads = makeReads(statusRef.current);
+            const g = track.expect ? await readyToReveal(s, { status: statusRef.current, reads, pin: reads.pin, expect: track.expect, now: Math.floor(Date.now() / 1000) }) : { ok: false, why: 'this swap has no recorded terms to check against' };
+            if (g.ok) { setRevealNote(null); s = await api.reveal(track.id, track.secret); } else setRevealNote(g.why);
+          } catch (e) { setRevealNote(e.message); } finally { revealing = false; }
         }
         if (live) setSwap(s);
         if (TERMINAL.includes(s.state)) { forget(s.hashlock); bch.rescan(); }
@@ -106,7 +115,7 @@ export default function App() {
       const r = dir === 'bch2base'
         ? await startBchToBase({ api, status, pair: pair.symbol, cents, baseAddress: baseTarget, wallet: bch })
         : await startBaseToBch({ api, status, pair: pair.symbol, cents, bchAddress: bchTarget, evm });
-      setTrack({ id: r.quote.id, secret: r.secret, userLockTx: r.userLockTx, dir, startedAt: Date.now() });
+      setTrack({ id: r.quote.id, secret: r.secret, userLockTx: r.userLockTx, dir, startedAt: Date.now(), expect: r.expect });
       setSwap(await api.swap(r.quote.id));
     } catch (e) {
       setError(e.body?.message ?? e.shortMessage ?? e.message);
@@ -245,6 +254,7 @@ export default function App() {
                   <div style={{ marginTop: 8 }}><button className="btn small" onClick={claimSelf}>{track.dir === 'bch2base' ? 'Claim on Base with my wallet' : 'Claim on Bitcoin Cash now'}</button> {claimMsg && <span className="sub">{claimMsg}</span>}</div>
                 </div>
               )}
+              {revealNote && swap.state === 'desk_locked' && <div className="notice warn" role="status">Your browser is checking the desk's lock on chain before it releases your secret. Not yet: {revealNote}.</div>}
               {(TERMINAL.includes(swap.state) || swap.state === 'quoted') && <button className="btn" onClick={() => { if (swap.state === 'quoted') forget(swap.hashlock); finish(); }}>{swap.state === 'quoted' ? 'Cancel this quote' : 'New swap'}</button>}
               {!TERMINAL.includes(swap.state) && <span className="sub">Keep this tab open. Your secret lives in it; a refund path exists either way.</span>}
             </div>

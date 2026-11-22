@@ -3,6 +3,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { clients, DESK_LOCK_ABI, DESK_LOCK_BYTECODE } from '../lib/evm.js';
 import { NETWORKS } from '../lib/config.js';
+import { addressesOf } from '../lib/keys.js';
+import { lockingBytecodeOf } from '../lib/bch.js';
 import testUsdc from '../contracts/evm/TestUSDC.json' with { type: 'json' };
 
 const net = NETWORKS[process.env.NETWORK ?? 'testnet'];
@@ -22,6 +24,10 @@ console.log('deployer', account.address, 'balance', await publicClient.getBalanc
 if (net.name === 'testnet' && !dep.token) { const t = await deploy(testUsdc.abi, testUsdc.bytecode); dep.token = t.address; dep.tokenTx = t.tx; }
 const token = evmInfo.chainId === 8453 ? '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' : dep.token;
 if (!dep.deskLock) { const d = await deploy(DESK_LOCK_ABI, DESK_LOCK_BYTECODE, [token]); dep.deskLock = d.address; dep.deskLockTx = d.tx; }
+// the browser build pins these: the desk's Base account and its Bitcoin Cash script
+dep.deskEvm = clients(evmInfo, process.env.DESK_EVM_KEY).account.address;
+const deskBch = addressesOf(process.env.DESK_BCH_KEY);
+dep.deskBchLock = lockingBytecodeOf(net.bch.network === 'mainnet' ? deskBch.mainnet : deskBch.chipnet);
 all[evmInfo.chainId] = dep;
 writeFileSync(file, JSON.stringify(all, null, 2) + '\n');
 console.log(JSON.stringify(dep));

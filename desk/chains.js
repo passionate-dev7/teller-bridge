@@ -2,7 +2,7 @@
 // chipnet / Base Sepolia / mainnet; tests swap in an in-memory BCH validator and a local anvil node.
 import { ElectrumNetworkProvider, MockNetworkProvider } from 'cashscript';
 import { binToHex, hexToBin, sha256 as libauthSha256, decodeTransactionUnsafe } from '@bitauth/libauth';
-import { swapLock, fundedLocks, lockBuilder, addressInputs, claimBuilder, refundBuilder, lockingBytecodeOf, medianTimePast, secretFromClaimTx, tokenAddressOf } from '../lib/bch.js';
+import { swapLock, fundedLocks, lockBuilder, addressInputs, claimBuilder, refundBuilder, lockingBytecodeOf, medianTimePast, confirmationsOf, secretFromClaimTx, tokenAddressOf } from '../lib/bch.js';
 import { addressesOf } from '../lib/keys.js';
 import { DESK_LOCK_ABI, ERC20_ABI, LOCK_STATE, lockId, readLock } from '../lib/evm.js';
 import { parseAbiItem } from 'viem';
@@ -16,10 +16,7 @@ export class ElectrumChain extends ElectrumNetworkProvider {
     return rows.map((r) => r.tx_hash);
   }
   medianTime() { return medianTimePast(this); }
-  async confirmations(txid) {
-    const t = await this.performRequest('blockchain.transaction.get', txid, true);
-    return t.confirmations ?? 0;
-  }
+  confirmations(txid) { return confirmationsOf(this, txid); }
 }
 
 /** In-memory chain that validates every spend against the BCH VM (tests). Mirrors ElectrumChain's extra reads. */

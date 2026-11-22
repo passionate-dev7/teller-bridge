@@ -1,7 +1,7 @@
 // Shared rig for the live end-to-end scripts: the real desk service over HTTP, real chipnet (or mainnet) BCH, and a real EVM
 // (Base Sepolia, or a local anvil that reports chain id 84532 when E2E_EVM=anvil). A scripted user plays the browser.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Network, TransactionBuilder, SignatureTemplate } from 'cashscript';
@@ -12,7 +12,8 @@ import { clients, ERC20_ABI, DESK_LOCK_ABI } from '../lib/evm.js';
 import { NETWORKS } from '../lib/config.js';
 import { addressesOf } from '../lib/keys.js';
 import { lockingBytecodeOf } from '../lib/bch.js';
-import { deskApi } from '../lib/client.js';
+import { deskApi, pinOf } from '../lib/client.js';
+import { readFileSync } from 'node:fs';
 import testUsdc from '../contracts/evm/TestUSDC.json' with { type: 'json' };
 import { privateKeyToAccount } from 'viem/accounts';
 
@@ -31,8 +32,9 @@ if (env.E2E_EVM === 'anvil') {
   anvil = spawn('anvil', ['--port', port, '--chain-id', '84532', '--block-time', '1', '--silent'], { stdio: 'ignore' });
   await sleep(1500);
   env.BASE_RPC_URL = 'http://127.0.0.1:' + port;
-  const dir = mkdtempSync(join(tmpdir(), 'e2e-'));
-  env.DEPLOYMENTS_FILE = join(dir, 'deployments.json');
+  // a fixed path: the web build pins the desk from this file, so the rig and the browser must read the same one
+  env.DEPLOYMENTS_FILE = env.RIG_DEPLOYMENTS ?? join(new URL('../data/', import.meta.url).pathname, 'rig-deployments.json');
+  mkdirSync(new URL('../data/', import.meta.url).pathname, { recursive: true });
   writeFileSync(env.DEPLOYMENTS_FILE, '{}');
   for (const k of ['DEPLOYER_EVM_KEY', 'DESK_EVM_KEY', 'TEST_USER_EVM_KEY']) {
     await fetch(env.BASE_RPC_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'anvil_setBalance', params: [privateKeyToAccount(env[k]).address, '0x8ac7230489e80000'] }) });
@@ -116,5 +118,6 @@ const waitFor = async (id, states, timeoutS = 900) => {
 };
 const explorer = { bch: (t) => net.bch.explorerTx + t, evm: (t) => net.evm.explorerTx + t };
 const stop = () => { clearInterval(tickTimer); server.close(); anvil?.kill(); };
-return { env, net, desk, cfg, token, evmInfo, chain, userA, userBchAddr, userBchLock, userEvm, category, tokensOf, satsOf, userUsdc, api, status, out, log, sleep, waitFor, explorer, stop };
+const pin = pinOf(JSON.parse(readFileSync(process.env.DEPLOYMENTS_FILE ?? new URL('../deployments.json', import.meta.url), 'utf8')), status.evm.chainId);
+return { pin, env, net, desk, cfg, token, evmInfo, chain, userA, userBchAddr, userBchLock, userEvm, category, tokensOf, satsOf, userUsdc, api, status, out, log, sleep, waitFor, explorer, stop };
 }

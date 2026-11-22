@@ -64,3 +64,30 @@ test('1 base2bch: the secret is not released until the BCH lock is on chain, con
   assert.equal((await ready(ctx, { bchRefundTime: ctx.now + 60 })).ok, false, 'BCH lock about to open for refund');
   assert.equal((await ready(ctx, { userBchLock: '76a914' + '00'.repeat(20) + '88ac' })).ok, false, 'pays someone else');
 });
+
+// ---------------------------------------------------------------- 2. the browser pins the desk's contract, token and accounts
+
+test('2 a status that names another DeskLock, token or desk account is refused, and so is a quote built on it', async () => {
+  const r = await fresh();
+  r.user.fundBch(10_000n);
+  const status = clone(await r.desk.status());
+  const pin = { chainId: status.evm.chainId, deskLock: r.deskLock, token: r.token, deskEvm: r.evm.address, deskBchLock: r.bch.lockingHex };
+  assert.deepEqual(client.checkStatus(status, pin), [], 'honest status');
+  const evil = '0x000000000000000000000000000000000000dEaD';
+  const bad = (f) => { const s = clone(status); f(s); return client.checkStatus(s, pin).join(); };
+  assert.match(bad((s) => { s.evm.deskLock = evil; }), /DeskLock/);
+  assert.match(bad((s) => { s.evm.token = evil; }), /token/);
+  assert.match(bad((s) => { s.evm.deskAddress = evil; }), /desk account/);
+  assert.match(bad((s) => { s.bch.deskLock = '76a914' + '11'.repeat(20) + '88ac'; }), /Bitcoin Cash desk/);
+  assert.match(bad((s) => { s.evm.chainId = 1; }), /chain/);
+  assert.match(client.checkStatus(status, undefined).join(), /no pinned desk/);
+  // a quote is refused when the status it was built on differs from the pin
+  const { hashlock } = r.user.secret();
+  const req = { dir: 'bch2base', pair: 'PUSD', sendUnits: '500', hashlock, userBchAddress: r.user.bch.chipnet, userEvm: r.user.evm.account.address };
+  const q = clone(await r.desk.createSwap(req));
+  q.bchLockAddress = r.user.bchContract(q).tokenAddress;
+  const forged = clone(status); forged.evm.deskLock = evil;
+  const problems = client.checkQuote(q, { ...req, userBchLock: q.userBchLock }, forged, r.clock(), r.chain, pin);
+  assert.match(problems.join(), /DeskLock/);
+  assert.deepEqual(client.checkQuote(q, { ...req, userBchLock: q.userBchLock }, status, r.clock(), r.chain, pin), []);
+});
