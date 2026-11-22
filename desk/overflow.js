@@ -26,7 +26,7 @@ export async function routerQuote({ sell, buy, amount, side }, { url = ROUTER, t
   });
 }
 
-export async function oneClickDry({ originAsset, destinationAsset, amount, recipient, refundTo, jwt = process.env.ONECLICK_JWT }) {
+export async function oneClickDry({ originAsset, destinationAsset, amount, recipient, refundTo, jwt = globalThis.process?.env?.ONECLICK_JWT }) {
   const r = await fetch(ONECLICK + '/quote', {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(jwt ? { authorization: 'Bearer ' + jwt } : {}) },

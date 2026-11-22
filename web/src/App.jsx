@@ -12,6 +12,7 @@ import Drawers from './Drawers.jsx';
 import Receipt from './Receipt.jsx';
 import PairDialog from './PairDialog.jsx';
 import Overflow from './Overflow.jsx';
+import Recorded from './Recorded.jsx';
 import { makeReads } from './reads.js';
 
 const TERMINAL = ['done', 'refunded', 'expired', 'abandoned'];
@@ -25,7 +26,9 @@ function useStatus(api) {
     const load = () => api.status().then((s) => { if (live) { setStatus(s); setOffline(false); } }).catch(() => live && setOffline(true));
     load();
     const id = setInterval(load, 5000);
-    return () => { live = false; clearInterval(id); };
+    // no answer within 4 s: show the recorded swaps instead of waiting on skeletons
+    const slow = setTimeout(() => live && setOffline(true), 4000);
+    return () => { live = false; clearInterval(id); clearTimeout(slow); };
   }, [api]);
   return { status, offline };
 }
@@ -56,6 +59,7 @@ export default function App() {
   const [peg, setPeg] = useState(null);
   useEffect(() => { api.peg().then(setPeg).catch(() => setPeg(null)); }, [api]);
 
+  const recorded = offline && !status;
   const pair = status?.pairs.find((p) => p.symbol === pairSym) ?? status?.pairs[0];
   const cents = parseCents(amount);
   const units = cents ? sendUnits(dir, cents) : null;
@@ -163,16 +167,18 @@ export default function App() {
         <div className="pills">
           {status && <span className="chip plain">{status.bch.network} + {status.evm.name}</span>}
           {status && <span className={'chip ' + (status.ready ? 'ok' : 'warn')}>{status.ready ? 'desk open' : 'desk refilling'}</span>}
-          {offline && <span className="chip warn">desk unreachable</span>}
+          {recorded && <><span className="chip plain">chipnet</span><span className="chip ok">recorded swaps</span></>}
+          {offline && !recorded && <span className="chip warn">desk unreachable</span>}
         </div>
       </header>
 
       <div className="lead">
         <h2>pusd in, usdc out, and back again.</h2>
-        <p>The card shows what the desk can fill right now. Both sides lock against the same secret, so either you are paid or you get your own coins back.</p>
+        <p>{recorded ? 'Real swaps the desk filled on chipnet, replayed leg by leg with their transaction ids. ' : 'The card shows what the desk can fill right now. '}Both sides lock against the same secret, so either you are paid or you get your own coins back.</p>
       </div>
 
       <main className="board">
+        {recorded ? <Recorded past={past} /> : <>
         <section className="slip panel" aria-label="Swap">
           {!track && (
             <>
@@ -283,6 +289,7 @@ export default function App() {
           )}
           {past.length === 0 && status && <p className="sub">No completed swaps yet on this desk.</p>}
         </div>
+        </>}
       </main>
 
       <section className="proof" aria-label="Why the desk cannot keep your money">
@@ -296,8 +303,8 @@ export default function App() {
       </section>
 
       <footer className="footer">
-        <span>{status ? <>Desk lock on Base <a className="mono" href={status.evm.explorerAddr + status.evm.deskLock} target="_blank" rel="noreferrer">{short(status.evm.deskLock, 8, 6)}</a>, desk wallet on Bitcoin Cash <a className="mono" href={status.bch.explorerAddr + status.bch.deskAddress} target="_blank" rel="noreferrer">{short(status.bch.deskAddress, 14, 6)}</a></> : 'Connecting to the desk'}</span>
-        <span>Desk fee {status ? (status.feeBps / 100).toFixed(2) + '%' : ''}</span>
+        <span>{recorded ? <>Recorded chipnet swaps. <a href="https://github.com/passionate-dev7/teller-bridge#run-it" target="_blank" rel="noreferrer">Run the desk yourself</a></> : status ? <>Desk lock on Base <a className="mono" href={status.evm.explorerAddr + status.evm.deskLock} target="_blank" rel="noreferrer">{short(status.evm.deskLock, 8, 6)}</a>, desk wallet on Bitcoin Cash <a className="mono" href={status.bch.explorerAddr + status.bch.deskAddress} target="_blank" rel="noreferrer">{short(status.bch.deskAddress, 14, 6)}</a></> : 'Connecting to the desk'}</span>
+        <span>Desk fee {status ? (status.feeBps / 100).toFixed(2) + '%' : past[0] ? (past[0].feeBps / 100).toFixed(2) + '%' : ''}</span>
       </footer>
 
       <PairDialog open={pairOpen && !bch.paired} onClose={() => setPairOpen(false)} uri={bch.wc.uri} qrUri={bch.wc.qrUri} />
