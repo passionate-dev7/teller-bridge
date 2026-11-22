@@ -11,3 +11,4 @@ cache/
 *.log
 .DS_Store
 .vercel/
+contracts/evm/lib/
