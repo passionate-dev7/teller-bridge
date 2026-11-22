@@ -67,7 +67,7 @@ export async function rig({ rules = {} } = {}) {
   await mint(evm.address, 10_000_000n); // 10 USDC
   await evm.ensureAllowance();
   const bch = new BchDesk({ provider: chain, prefix: 'bchtest', keyHex: deskBchKey });
-  const cfg = { name: 'testnet', bch: NETWORKS.testnet.bch, evm: evmInfo, pairs: NETWORKS.testnet.pairs, rules: { ...DEFAULT_RULES, ...rules } };
+  const cfg = { name: 'testnet', bch: NETWORKS.testnet.bch, evm: evmInfo, pairs: NETWORKS.testnet.pairs, rules: { ...DEFAULT_RULES, zeroConfMaxCents: 10n ** 9n, ...rules } };
   const store = new Store();
   const desk = new Desk({ cfg, bch, evm, store, clock });
 

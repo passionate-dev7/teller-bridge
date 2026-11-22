@@ -253,9 +253,15 @@ export class Desk {
         const utxos = await this.bch.funded(s);
         if (utxos.length) {
           s.txs.deskClaim = await this.bch.claim(s, utxos[0], s.secret);
-          return this.#move(s, 'done', 'desk_claimed_pusd', { txid: s.txs.deskClaim, chain: 'bch' });
+          this.#ev(s, 'desk_claimed_pusd', { txid: s.txs.deskClaim, chain: 'bch' });
+          this.store.save(s);
         }
-        return this.#move(s, 'done', 'done');
+        // done only when the chain shows the user's lock spent by a claim that carries our secret
+        if (await this.bch.findSecret(s)) return this.#move(s, 'done', 'done');
+        if (utxos.length || (s.txs.deskClaim && (await this.bch.txKnown(s.txs.deskClaim)))) return; // claim in flight, check again next tick
+        s.note = 'the user lock disappeared without a claim of ours (double-spent)';
+        this.log('LOSS', s.id, s.note);
+        return this.#move(s, 'loss', 'lock_vanished');
       }
       if (l.state === LOCK_STATE.Open && evmNow >= s.evmTimeout) {
         const r = await this.evm.refund(s.evmLockId);
@@ -322,7 +328,10 @@ export class Desk {
           s.txs.deskClaim = r.hash;
           return this.#move(s, 'done', 'desk_claimed_usdc', { txid: r.hash, chain: 'evm' });
         }
-        return this.#move(s, 'done', 'done');
+        if (l.state === LOCK_STATE.Claimed) return this.#move(s, 'done', 'done');
+        s.note = 'the user USDC lock ran out or was refunded before the desk could claim it';
+        this.log('LOSS', s.id, s.note);
+        return this.#move(s, 'loss', 'usdc_lock_gone');
       }
       if (utxos.length && (await this.bch.mtp()) >= s.bchRefundTime) {
         s.txs.deskRefundBch = await this.bch.refund(s, utxos[0]);

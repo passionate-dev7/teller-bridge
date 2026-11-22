@@ -9,7 +9,7 @@ const root = new URL('..', import.meta.url).pathname;
 const work = mkdtempSync(join(tmpdir(), 'desk-mut-'));
 for (const d of ['desk', 'lib', 'contracts', 'test', 'package.json']) cpSync(join(root, d), join(work, d), { recursive: true, filter: (p) => !p.includes('/contracts/evm/lib') && !p.includes('/contracts/evm/out') });
 symlinkSync(join(root, 'node_modules'), join(work, 'node_modules'));
-const FILES = { engine: join(work, 'desk/engine.js'), client: join(work, 'lib/client.js'), bch: join(work, 'lib/bch.js'), wizard: join(work, 'lib/wizard.js') };
+const FILES = { engine: join(work, 'desk/engine.js'), client: join(work, 'lib/client.js'), bch: join(work, 'lib/bch.js'), config: join(work, 'lib/config.js'), wizard: join(work, 'lib/wizard.js') };
 const originals = Object.fromEntries(Object.entries(FILES).map(([k, f]) => [k, readFileSync(f, 'utf8')]));
 
 const M = [
@@ -40,7 +40,7 @@ const M = [
   ['wallet transactions priced below the relay minimum fee rate', "export const FEE_RATE = 1.2;", 'export const FEE_RATE = 0.5;', 'bch'],
   ['wallet is asked to sign without the token data of its coins', "const sourceOutputs = wc.sourceOutputs.map((so) => sourceOutputToRelay(so));", 'const sourceOutputs = wc.sourceOutputs.map((so) => sourceOutputToRelay({ ...so, token: undefined }));', 'wizard'],
   ['wallet signs inputs it cannot map to its own paths', "if (!m) throw new Error('input ' + n + ' is not a coin of the connected wallet');", '', 'wizard'],
-  ['reveal gate: no check that the desk's Base lock is open', "if (l.state !== LOCK_STATE.Open) return no('no open lock on Base');", '', 'client'],
+  ['reveal gate: no check that the desk Base lock is open', "if (l.state !== LOCK_STATE.Open) return no('no open lock on Base');", '', 'client'],
   ['reveal gate: lock may be made by anyone', "if (l.sender.toLowerCase() !== pin.deskEvm.toLowerCase()) return no('lock was not made by the desk account');", '', 'client'],
   ['reveal gate: lock may pay another recipient', "if (l.recipient.toLowerCase() !== swap.userEvm.toLowerCase()) return no('lock does not pay your address');", '', 'client'],
   ['reveal gate: lock may hold less than the quote', "if (BigInt(l.amount) !== recv) return no('lock holds a different amount');", '', 'client'],
@@ -55,6 +55,9 @@ const M = [
   ['pin: a different desk account is accepted', "if (!eq(status.evm.deskAddress, pin.deskEvm)) bad.push", 'if (false) bad.push', 'client'],
   ['pin: a different BCH desk script is accepted', "if (!eq(status.bch.deskLock, pin.deskBchLock)) bad.push", 'if (false) bad.push', 'client'],
   ['pin: an unpinned build trusts the server', "if (!pin) return ['this build has no pinned desk for chain ' + status?.evm?.chainId];", '', 'client'],
+  ['0-conf limit raised above what the desk can afford to lose', "zeroConfMaxCents: 100n,", 'zeroConfMaxCents: 2500n,', 'config'],
+  ['bch2base: swap booked done although the user lock vanished', "if (await this.bch.findSecret(s)) return this.#move(s, 'done', 'done');", "return this.#move(s, 'done', 'done');"],
+  ['base2bch: swap booked done although the user USDC lock is gone', "return this.#move(s, 'loss', 'usdc_lock_gone');", "return this.#move(s, 'done', 'done');"],
   ['client accepts a different hashlock', "if (q.hashlock !== req.hashlock) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a different send amount', "if (q.sendUnits !== String(req.sendUnits)) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a refund or recipient script that is not the wallet', "if (q.userBchLock !== req.userBchLock) bad.push", 'if (false) bad.push', 'client'],

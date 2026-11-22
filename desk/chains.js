@@ -63,6 +63,8 @@ export class BchDesk {
   async plainSats() { return (await this.utxos()).reduce((a, u) => (u.token ? a : a + u.satoshis), 0n); }
   mtp() { return this.provider.medianTime(); }
   confirmations(txid) { return this.provider.confirmations(txid); }
+  /** does the chain server know this transaction (mempool or block)? */
+  async txKnown(txid) { try { return !!(await this.provider.getRawTransaction(txid)); } catch { return false; } }
 
   /** Funded swap UTXOs at the lock address of swap `s` (carrying at least the amount the swap is about). */
   async funded(s) {

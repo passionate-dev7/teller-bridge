@@ -91,3 +91,52 @@ test('2 a status that names another DeskLock, token or desk account is refused, 
   assert.match(problems.join(), /DeskLock/);
   assert.deepEqual(client.checkQuote(q, { ...req, userBchLock: q.userBchLock }, status, r.clock(), r.chain, pin), []);
 });
+
+// ---------------------------------------------------------------- 3. 0-conf exposure is small, and a vanished user lock is never booked as done
+
+test('3 the 0-conf limit is at most one dollar', async () => {
+  const { DEFAULT_RULES } = await import('../lib/config.js');
+  assert.ok(DEFAULT_RULES.zeroConfMaxCents <= 100n, 'limit is ' + DEFAULT_RULES.zeroConfMaxCents);
+});
+
+test('3 the user lock vanishes (double-spent) after the desk paid: the swap is a loss, not done', async () => {
+  const r = await fresh();
+  r.user.fundBch(10_000n);
+  const { secret, hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'bch2base', sendUnits: '500', hashlock });
+  const lockTx = await r.user.lockBch(q);
+  await r.tick();
+  assert.equal(r.swap(q.id).state, 'desk_locked');
+  // the conflicting spend wins: the lock output never exists
+  r.chain.utxoSet = r.chain.utxoSet.filter(([, u]) => u.txid !== lockTx);
+  await r.desk.reveal(q.id, secret);
+  assert.notEqual(r.swap(q.id).state, 'done');
+  assert.equal(r.swap(q.id).state, 'loss');
+  assert.equal(r.desk.recentDone().length, 0, 'not listed as a completed swap');
+});
+
+test('3 an honest claim is still booked done only once the chain shows the lock spent by a claim with the secret', async () => {
+  const r = await fresh();
+  r.user.fundBch(10_000n);
+  const { secret, hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'bch2base', sendUnits: '300', hashlock });
+  await r.user.lockBch(q);
+  await r.tick();
+  await r.desk.reveal(q.id, secret);
+  assert.equal(r.swap(q.id).state, 'done');
+  assert.equal(await r.bch.findSecret(r.store.get(q.id)), secret);
+});
+
+test('3 base2bch: if the user USDC lock is gone when the desk goes to claim it, that is a loss, not done', async () => {
+  const r = await fresh();
+  await r.user.fundUsdc(5_000_000n);
+  r.user.fundBch();
+  const { secret, hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'base2bch', sendUnits: '1000000', hashlock });
+  await r.user.lockUsdc(q);
+  await r.tick();
+  const real = r.evm.lockState.bind(r.evm);
+  r.evm.lockState = async (id) => ({ ...(await real(id)), state: 3 }); // refunded under the desk's feet
+  await r.desk.reveal(q.id, secret);
+  assert.equal(r.swap(q.id).state, 'loss');
+});
