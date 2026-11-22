@@ -249,6 +249,9 @@ test('6 the rate limiter forgets old clients and cannot grow without bound', asy
   for (let i = 0; i < 20_000; i++) limited('ip' + i, t + i);
   assert.ok(limited.size() <= 1000, 'map holds ' + limited.size());
   assert.equal(limited('a', t + 61_000 + 20_000), false, 'window passed');
+  const small = rateLimiter({ limit: 3, windowMs: 60_000, maxKeys: 1000 });
+  [1, 2, 3, 4].forEach(() => small('b', t));
+  assert.equal(small('b', t + 61_000), false, 'a client is forgiven once its window has passed');
 });
 
 test('6 a Base RPC error during the desk lock does not lose the log cursor', async () => {
@@ -299,4 +302,57 @@ test('6 the desk refuses to start against a DeskLock that holds a different toke
   await assert.rejects(wrong.verifyDeployment(), /token/);
   const nowhere = new EvmDesk({ publicClient: r.publicClient, walletClient: r.evm.walletClient, account: r.evm.account, deskLock: '0x000000000000000000000000000000000000dEaD', token: r.token });
   await assert.rejects(nowhere.verifyDeployment());
+});
+
+// ---------------------------------------------------------------- gaps the mutation run found in the tests above
+
+test('5 the per-address cap counts swaps past the quote stage too', async () => {
+  const r = await fresh();
+  r.user.fundBch(10_000n);
+  const mk = (h) => ({ dir: 'bch2base', pair: 'PUSD', sendUnits: '100', hashlock: h, userBchAddress: r.user.bch.chipnet, userEvm: r.user.evm.account.address });
+  const keep = r.user.secret();
+  const first = await r.desk.createSwap(mk(keep.hashlock), '7.7.7.7');
+  await r.desk.createSwap(mk(r.user.secret().hashlock), '7.7.7.7');
+  await r.desk.createSwap(mk(r.user.secret().hashlock), '7.7.7.7');
+  await r.user.lockBch(first);
+  await r.tick();
+  assert.equal(r.swap(first.id).state, 'desk_locked');
+  await assert.rejects(r.desk.createSwap(mk(r.user.secret().hashlock), '7.7.7.7'), (e) => e.code === 'busy');
+});
+
+test('1 each field of the desk lock is checked on its own, not just through the others', async () => {
+  const r = await fresh();
+  r.user.fundBch(10_000n);
+  const { secret, hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'bch2base', sendUnits: '300', hashlock });
+  await r.user.lockBch(q);
+  await r.tick();
+  const ctx = await revealCtx(r, q);
+  const dead = '0x000000000000000000000000000000000000dEaD';
+  // the browser's own record agrees with the (wrong) swap fields, so only the chain can say no
+  const agree = (k, v) => ({ ...ctx, expect: { ...ctx.expect, [k]: v } });
+  assert.equal((await ready(agree('userEvm', dead), { userEvm: dead })).ok, false, 'lock pays someone else');
+  assert.equal((await ready(agree('hashlock', 'ab'.repeat(32)), { hashlock: 'ab'.repeat(32) })).ok, false, 'lock uses another hashlock');
+  // a lock that exists with every field right but is already claimed
+  await r.user.claimUsdcSelf(ctx.swap, secret);
+  assert.equal((await ready(ctx)).ok, false, 'a claimed lock is not an open lock');
+});
+
+test('1 base2bch: a BCH refund time that opens too close to the Base refund is refused even when a lock exists at that address', async () => {
+  const r = await fresh();
+  await r.user.fundUsdc(5_000_000n);
+  const { hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'base2bch', sendUnits: '1000000', hashlock });
+  await r.user.lockUsdc(q);
+  await r.tick();
+  const ctx = await revealCtx(r, q);
+  const { swapLock } = await import('../lib/bch.js');
+  const { randomUtxo } = await import('cashscript');
+  const refundTime = ctx.swap.evmTimeout - ctx.status.windows.evmOverlap + 60;
+  const contract = swapLock({ hashlock, recipientLock: ctx.swap.userBchLock, refundLock: r.bch.lockingHex, refundTime }, r.chain);
+  const u = r.chain.addUtxo(contract.address, { ...randomUtxo(), satoshis: 3000n, token: { category: ctx.swap.category, amount: BigInt(ctx.swap.recvUnits) } });
+  r.chain.confirmed.add(u.txid);
+  const honest = await ready(ctx, { bchRefundTime: ctx.swap.evmTimeout - ctx.status.windows.evmOverlap - 600 });
+  assert.equal(honest.ok, false, 'no lock at that other address');
+  assert.equal((await ready(ctx, { bchRefundTime: refundTime })).ok, false, 'a funded lock at the unsafe time');
 });

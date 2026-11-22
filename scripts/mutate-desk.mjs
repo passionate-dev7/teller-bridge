@@ -62,7 +62,7 @@ const M = [
   ['bch2base: swap booked done although the user lock vanished', "if (await this.bch.findSecret(s)) return this.#move(s, 'done', 'done');", "return this.#move(s, 'done', 'done');"],
   ['base2bch: swap booked done although the user USDC lock is gone', "return this.#move(s, 'loss', 'usdc_lock_gone');", "return this.#move(s, 'done', 'done');"],
   ['base2bch: refund_wait stops reading the BCH lock', "      if (s.txs.deskLock) {\n        if (!s.secret) {", "      if (false) {\n        if (!s.secret) {"],
-  ['base2bch: a claim seen too late is not booked as a loss', "s.note = 'the BCH lock was claimed but the Base lock had already run out';", "s.note = 'x'; userLock.state = 0;"],
+  ['base2bch: a claim seen too late is not booked as a loss', "          this.log('LOSS', s.id, s.note);\n          return this.#move(s, 'loss', 'usdc_lock_gone');", "          s.txs.skipped = 1;"],
   ['forwarded-for believed from any peer', ".test(peer)) return peer;", ".test(peer) && false) return peer;", 'server'],
   ['forwarded-for: the client-chosen entry is used', "list[list.length - hops]", "list[0]", 'server'],
   ['rate limiter map grows without bound', "if (hits.size > maxKeys) for", "if (false) for", 'server'],
