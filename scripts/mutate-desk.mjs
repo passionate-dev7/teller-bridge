@@ -9,8 +9,8 @@ const root = new URL('..', import.meta.url).pathname;
 const work = mkdtempSync(join(tmpdir(), 'desk-mut-'));
 for (const d of ['desk', 'lib', 'contracts', 'test', 'package.json']) cpSync(join(root, d), join(work, d), { recursive: true, filter: (p) => !p.includes('/contracts/evm/lib') && !p.includes('/contracts/evm/out') });
 symlinkSync(join(root, 'node_modules'), join(work, 'node_modules'));
-const ENGINE = join(work, 'desk/engine.js');
-const original = readFileSync(ENGINE, 'utf8');
+const FILES = { engine: join(work, 'desk/engine.js'), client: join(work, 'lib/client.js') };
+const originals = Object.fromEntries(Object.entries(FILES).map(([k, f]) => [k, readFileSync(f, 'utf8')]));
 
 const M = [
   ['bch2base: desk never refunds its USDC at the Base timeout', "if (l.state === LOCK_STATE.Open && evmNow >= s.evmTimeout) {", 'if (false) {'],
@@ -37,16 +37,27 @@ const M = [
   ['quotes never expire', "if (s.state === 'quoted' && now > s.quoteExpiry) return this.#move(s, 'expired');", ''],
   ['hashlock reuse allowed', "if (this.store.byHashlock(hashlock)) throw", 'if (false) throw'],
   ['minimum swap not enforced', "if (cents < minCents)", 'if (false)'],
+  ['client accepts a different hashlock', "if (q.hashlock !== req.hashlock) bad.push", 'if (false) bad.push', 'client'],
+  ['client accepts a different send amount', "if (q.sendUnits !== String(req.sendUnits)) bad.push", 'if (false) bad.push', 'client'],
+  ['client accepts a refund or recipient script that is not the wallet', "if (q.userBchLock !== req.userBchLock) bad.push", 'if (false) bad.push', 'client'],
+  ['client accepts another Base address', "if (q.userEvm.toLowerCase() !== req.userEvm.toLowerCase()) bad.push", 'if (false) bad.push', 'client'],
+  ['client accepts an off-rate receive amount', "if (BigInt(q.recvUnits) !== want) bad.push", 'if (false) bad.push', 'client'],
+  ['client accepts a short BCH refund time', "if (q.bchRefundTime < minRefund) bad.push", 'if (false) bad.push', 'client'],
+  ['client accepts a short Base refund time', "if (q.evmTimeout < nowSec + status.windows.userEvmWindow - 10 * 60) bad.push", 'if (false) bad.push', 'client'],
+  ['client trusts the desk lock address string', "if (bchContractFromQuote(q, status, provider).tokenAddress !== q.bchLockAddress) bad.push", 'if (false) bad.push', 'client'],
+  ['client accepts a Base lock id that does not follow from the terms', "if (id !== q.evmLockId) bad.push", 'if (false) bad.push', 'client'],
 ];
 
 const rows = [];
-const run = () => spawnSync('node', ['--test', 'test/desk.test.js'], { cwd: work, encoding: 'utf8' });
+const run = () => spawnSync('node', ['--test', 'test/desk.test.js', 'test/client.test.js'], { cwd: work, encoding: 'utf8' });
 const base = run();
 rows.push({ mutant: 'ORIGINAL', verdict: base.status === 0 ? 'green' : 'RED (unexpected)', failed: '' });
-for (const [name, from, to] of M) {
+for (const [name, from, to, which = 'engine'] of M) {
+  const original = originals[which];
   if (!original.includes(from)) { rows.push({ mutant: name, verdict: 'ANCHOR MISSING', failed: '' }); continue; }
-  writeFileSync(ENGINE, original.replace(from, () => to));
+  writeFileSync(FILES[which], original.replace(from, () => to));
   const r = run();
+  writeFileSync(FILES[which], original);
   rows.push({ mutant: name, verdict: r.status === 0 ? 'SURVIVED' : 'killed', failed: (r.stdout.match(/^ℹ fail (\d+)/m) ?? [])[1] });
 }
 console.table(rows);
