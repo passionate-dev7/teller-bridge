@@ -78,7 +78,7 @@ export class Desk {
       quoteTtl: this.rules.quoteTtl,
       bch: { ...this.cfg.bch, deskAddress: this.bch.tokenAddress(), deskLock: this.bch.lockingHex },
       evm: { chainId: this.cfg.evm.chainId, name: this.cfg.evm.name, explorerTx: this.cfg.evm.explorerTx, explorerAddr: this.cfg.evm.explorerAddr, deskLock: this.evm.deskLock, token: this.evm.token, deskAddress: this.evm.address },
-      windows: { userBchWindow: this.rules.userBchWindow, deskEvmWindow: this.rules.deskEvmWindow, userEvmWindow: this.rules.userEvmWindow, deskBchWindow: this.rules.deskBchWindow },
+      windows: { userBchWindow: this.rules.userBchWindow, deskEvmWindow: this.rules.deskEvmWindow, userEvmWindow: this.rules.userEvmWindow, deskBchWindow: this.rules.deskBchWindow, overlap: this.rules.overlap, evmOverlap: this.rules.evmOverlap },
       pairs: cap.pairs,
     };
   }

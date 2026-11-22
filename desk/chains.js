@@ -4,7 +4,7 @@ import { ElectrumNetworkProvider, MockNetworkProvider } from 'cashscript';
 import { binToHex, hexToBin, sha256 as libauthSha256, decodeTransactionUnsafe } from '@bitauth/libauth';
 import { swapLock, fundedLocks, lockBuilder, addressInputs, claimBuilder, refundBuilder, lockingBytecodeOf, medianTimePast, secretFromClaimTx, tokenAddressOf } from '../lib/bch.js';
 import { addressesOf } from '../lib/keys.js';
-import { DESK_LOCK_ABI, ERC20_ABI, LOCK_STATE, lockId } from '../lib/evm.js';
+import { DESK_LOCK_ABI, ERC20_ABI, LOCK_STATE, lockId, readLock } from '../lib/evm.js';
 import { parseAbiItem } from 'viem';
 
 const scriptHash = (lockingHex) => binToHex(libauthSha256.hash(hexToBin(lockingHex)).reverse());
@@ -126,10 +126,7 @@ export class EvmDesk {
     return this.#send({ address: this.token, abi: ERC20_ABI, functionName: 'approve', args: [this.deskLock, 2n ** 255n] });
   }
 
-  async lockState(id) {
-    const [sender, recipient, timeout, state, amount, hashlock] = await this.publicClient.readContract({ address: this.deskLock, abi: DESK_LOCK_ABI, functionName: 'locks', args: [id] });
-    return { sender, recipient, timeout: Number(timeout), state, amount, hashlock };
-  }
+  lockState(id) { return readLock(this.publicClient, this.deskLock, id); }
 
   lockId(args) { return lockId(args); }
   lock({ recipient, hashlock, timeout, amount }) {

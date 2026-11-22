@@ -1,0 +1,66 @@
+// Findings of the security review, each as a test that failed against the code that had the hole.
+import { test, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { rig } from './harness.js';
+import * as client from '../lib/client.js';
+import { readLock } from '../lib/evm.js';
+
+const rigs = [];
+const fresh = async (o) => { const r = await rig(o); rigs.push(r); return r; };
+after(() => rigs.forEach((r) => r.stop()));
+const clone = (x) => JSON.parse(JSON.stringify(x));
+
+/** what a browser holds after it asked for a quote: the desk's view of the swap, the desk status, and its own chain reads */
+async function revealCtx(r, q, { pinned } = {}) {
+  const status = clone(await r.desk.status());
+  const swap = clone(r.swap(q.id));
+  const reads = { evmLock: (id) => readLock(r.publicClient, r.deskLock, id), provider: r.chain, confirmations: (txid) => r.chain.confirmations(txid) };
+  const pin = pinned ?? { deskEvm: r.evm.address, deskLock: r.deskLock, token: r.token };
+  const expect = { userEvm: swap.userEvm, userBchLock: swap.userBchLock, hashlock: swap.hashlock, sendUnits: swap.sendUnits };
+  return { status, swap, reads, pin, expect, now: r.clock() };
+}
+const ready = (ctx, tweak = {}) => client.readyToReveal({ ...ctx.swap, ...tweak }, { ...ctx, ...(tweak.__ctx ?? {}) });
+
+// ---------------------------------------------------------------- 1. the browser reads the desk's lock itself before it reveals
+
+test('1 bch2base: the secret is not released on the desk\'s word, only when Base shows the right lock', async () => {
+  const r = await fresh();
+  r.user.fundBch(10_000n);
+  const { hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'bch2base', sendUnits: '300', hashlock });
+  await r.user.lockBch(q);
+  await r.tick();
+  const ctx = await revealCtx(r, q);
+  assert.equal(ctx.swap.state, 'desk_locked');
+  assert.equal((await ready(ctx)).ok, true, 'honest lock passes');
+  // the server claims a lock that does not exist on chain
+  assert.equal((await ready(ctx, { evmLockId: '0x' + '11'.repeat(32) })).ok, false, 'empty lock');
+  // lock exists but is for less than the quote
+  assert.equal((await ready(ctx, { recvUnits: String(BigInt(ctx.swap.recvUnits) + 1n) })).ok, false, 'wrong amount');
+  assert.equal((await ready(ctx, { hashlock: 'ab'.repeat(32) })).ok, false, 'wrong hashlock');
+  assert.equal((await ready(ctx, { userEvm: '0x000000000000000000000000000000000000dEaD' })).ok, false, 'wrong recipient');
+  // the desk lock must run out well before the user's own BCH refund opens
+  assert.equal((await ready(ctx, { bchRefundTime: ctx.swap.evmTimeout + 60 })).ok, false, 'timeout ordering');
+  // a lock that is about to expire cannot be claimed in time
+  assert.equal((await ready({ ...ctx, now: ctx.swap.evmTimeout - 60 })).ok, false, 'too close to expiry');
+  // locked by someone other than the pinned desk account
+  assert.equal((await ready({ ...ctx, pin: { ...ctx.pin, deskEvm: '0x000000000000000000000000000000000000dEaD' } })).ok, false, 'not the pinned desk');
+});
+
+test('1 base2bch: the secret is not released until the BCH lock is on chain, confirmed, for the right amount and with safe timing', async () => {
+  const r = await fresh();
+  await r.user.fundUsdc(5_000_000n);
+  const { hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'base2bch', sendUnits: '1000000', hashlock });
+  await r.user.lockUsdc(q);
+  await r.tick();
+  const ctx = await revealCtx(r, q);
+  assert.equal(ctx.swap.state, 'desk_locked');
+  assert.equal((await ready(ctx)).ok, false, 'a mempool lock is not enough');
+  r.chain.confirmed.add(ctx.swap.txs.deskLock);
+  assert.equal((await ready(ctx)).ok, true, 'confirmed honest lock passes');
+  assert.equal((await ready(ctx, { recvUnits: String(BigInt(ctx.swap.recvUnits) + 1n) })).ok, false, 'lock holds less than the quote');
+  assert.equal((await ready(ctx, { bchRefundTime: ctx.swap.evmTimeout })).ok, false, 'BCH refund must open well before the Base refund');
+  assert.equal((await ready(ctx, { bchRefundTime: ctx.now + 60 })).ok, false, 'BCH lock about to open for refund');
+  assert.equal((await ready(ctx, { userBchLock: '76a914' + '00'.repeat(20) + '88ac' })).ok, false, 'pays someone else');
+});
