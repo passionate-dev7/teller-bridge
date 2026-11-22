@@ -1,0 +1,28 @@
+pragma cashscript ^0.14.0;
+
+// Hash-timelocked escrow for one CashTokens fungible-token UTXO.
+// claim:  anyone holding the 32-byte secret may spend, but the single output must pay recipientLock the whole token amount.
+// refund: after refundTime anyone may spend, but the single output must pay refundLock the whole token amount.
+// No signature is checked on either path, so a relay can broadcast for a user who is offline.
+contract SwapLock(bytes32 hashlock, bytes recipientLock, bytes refundLock, int refundTime, int maxFee) {
+    function claim(bytes secret) {
+        require(secret.length == 32);
+        require(sha256(secret) == hashlock);
+        require(tx.inputs.length == 1);
+        require(tx.outputs.length == 1);
+        require(tx.outputs[0].lockingBytecode == recipientLock);
+        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);
+        require(tx.outputs[0].tokenAmount == tx.inputs[this.activeInputIndex].tokenAmount);
+        require(tx.outputs[0].value >= tx.inputs[this.activeInputIndex].value - maxFee);
+    }
+
+    function refund() {
+        require(tx.time >= refundTime);
+        require(tx.inputs.length == 1);
+        require(tx.outputs.length == 1);
+        require(tx.outputs[0].lockingBytecode == refundLock);
+        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);
+        require(tx.outputs[0].tokenAmount == tx.inputs[this.activeInputIndex].tokenAmount);
+        require(tx.outputs[0].value >= tx.inputs[this.activeInputIndex].value - maxFee);
+    }
+}

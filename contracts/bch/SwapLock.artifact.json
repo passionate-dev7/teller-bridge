@@ -1,0 +1,120 @@
+{
+  "contractName": "SwapLock",
+  "constructorInputs": [
+    {
+      "name": "hashlock",
+      "type": "bytes32"
+    },
+    {
+      "name": "recipientLock",
+      "type": "bytes"
+    },
+    {
+      "name": "refundLock",
+      "type": "bytes"
+    },
+    {
+      "name": "refundTime",
+      "type": "int"
+    },
+    {
+      "name": "maxFee",
+      "type": "int"
+    }
+  ],
+  "abi": [
+    {
+      "name": "claim",
+      "inputs": [
+        {
+          "name": "secret",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "refund",
+      "inputs": []
+    }
+  ],
+  "bytecode": "OP_5 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_6 OP_PICK OP_SIZE OP_NIP 20 OP_NUMEQUALVERIFY OP_6 OP_ROLL OP_SHA256 OP_EQUALVERIFY OP_TXINPUTCOUNT OP_1 OP_NUMEQUALVERIFY OP_TXOUTPUTCOUNT OP_1 OP_NUMEQUALVERIFY OP_0 OP_OUTPUTBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENAMOUNT OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_NUMEQUALVERIFY OP_0 OP_OUTPUTVALUE OP_INPUTINDEX OP_UTXOVALUE OP_4 OP_ROLL OP_SUB OP_GREATERTHANOREQUAL OP_NIP OP_NIP OP_NIP OP_ELSE OP_5 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_3 OP_ROLL OP_CHECKLOCKTIMEVERIFY OP_DROP OP_TXINPUTCOUNT OP_1 OP_NUMEQUALVERIFY OP_TXOUTPUTCOUNT OP_1 OP_NUMEQUALVERIFY OP_0 OP_OUTPUTBYTECODE OP_3 OP_ROLL OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENAMOUNT OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_NUMEQUALVERIFY OP_0 OP_OUTPUTVALUE OP_INPUTINDEX OP_UTXOVALUE OP_4 OP_ROLL OP_SUB OP_GREATERTHANOREQUAL OP_NIP OP_NIP OP_ENDIF",
+  "source": "pragma cashscript ^0.14.0;\n\n// Hash-timelocked escrow for one CashTokens fungible-token UTXO.\n// claim:  anyone holding the 32-byte secret may spend, but the single output must pay recipientLock the whole token amount.\n// refund: after refundTime anyone may spend, but the single output must pay refundLock the whole token amount.\n// No signature is checked on either path, so a relay can broadcast for a user who is offline.\ncontract SwapLock(bytes32 hashlock, bytes recipientLock, bytes refundLock, int refundTime, int maxFee) {\n    function claim(bytes secret) {\n        require(secret.length == 32);\n        require(sha256(secret) == hashlock);\n        require(tx.inputs.length == 1);\n        require(tx.outputs.length == 1);\n        require(tx.outputs[0].lockingBytecode == recipientLock);\n        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);\n        require(tx.outputs[0].tokenAmount == tx.inputs[this.activeInputIndex].tokenAmount);\n        require(tx.outputs[0].value >= tx.inputs[this.activeInputIndex].value - maxFee);\n    }\n\n    function refund() {\n        require(tx.time >= refundTime);\n        require(tx.inputs.length == 1);\n        require(tx.outputs.length == 1);\n        require(tx.outputs[0].lockingBytecode == refundLock);\n        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);\n        require(tx.outputs[0].tokenAmount == tx.inputs[this.activeInputIndex].tokenAmount);\n        require(tx.outputs[0].value >= tx.inputs[this.activeInputIndex].value - maxFee);\n    }\n}\n",
+  "fingerprint": "30ab8ffce494ae72b512d3c65ea69a0d74b66b2bc5a2ac367b7092d3d9723099",
+  "debug": {
+    "bytecode": "5579009c635679827701209d567aa888c3519dc4519d00cd8800d1c0ce8800d3c0d09d00ccc0c6547a94a277777767557a519d537ab175c3519dc4519d00cd537a8800d1c0ce8800d3c0d09d00ccc0c6547a94a2777768",
+    "sourceMap": "8:4:17:5;;;;;9:16:9:22;;:::29:1;;:33::35:0;:8::37:1;10:23:10:29:0;;:16::30:1;:8::44;11:16:11:32:0;:36::37;:8::39:1;12:16:12:33:0;:37::38;:8::40:1;13:27:13:28:0;:16::45:1;:8::64;14:27:14:28:0;:16::43:1;:57::78:0;:47::93:1;:8::95;15:27:15:28:0;:16::41:1;:55::76:0;:45::89:1;:8::91;16:27:16:28:0;:16::35:1;:49::70:0;:39::77:1;:80::86:0;;:39:::1;:8::88;8:33:17:5;;;:4;19::27::0;;;;20:27:20:37;;:8::39:1;;21:16:21:32:0;:36::37;:8::39:1;22:16:22:33:0;:37::38;:8::40:1;23:27:23:28:0;:16::45:1;:49::59:0;;:8::61:1;24:27:24:28:0;:16::43:1;:57::78:0;:47::93:1;:8::95;25:27:25:28:0;:16::41:1;:55::76:0;:45::89:1;:8::91;26:27:26:28:0;:16::35:1;:49::70:0;:39::77:1;:80::86:0;;:39:::1;:8::88;19:22:27:5;;7:0:28:1",
+    "logs": [],
+    "requires": [
+      {
+        "ip": 15,
+        "line": 9
+      },
+      {
+        "ip": 19,
+        "line": 10
+      },
+      {
+        "ip": 22,
+        "line": 11
+      },
+      {
+        "ip": 25,
+        "line": 12
+      },
+      {
+        "ip": 28,
+        "line": 13
+      },
+      {
+        "ip": 33,
+        "line": 14
+      },
+      {
+        "ip": 38,
+        "line": 15
+      },
+      {
+        "ip": 47,
+        "line": 16
+      },
+      {
+        "ip": 57,
+        "line": 20
+      },
+      {
+        "ip": 61,
+        "line": 21
+      },
+      {
+        "ip": 64,
+        "line": 22
+      },
+      {
+        "ip": 69,
+        "line": 23
+      },
+      {
+        "ip": 74,
+        "line": 24
+      },
+      {
+        "ip": 79,
+        "line": 25
+      },
+      {
+        "ip": 88,
+        "line": 26
+      }
+    ],
+    "sourceTags": "42:44:sc;83:84:sc"
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.14.0",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-11-21T12:01:02.374Z"
+}
