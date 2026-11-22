@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Teller: BCH BLAZE 2026 presentation</title>
+<meta name="description" content="Atomic swaps between PUSD and MUSD on Bitcoin Cash and USDC on Base, filled from a funded desk">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7f9;--ink:#13161a;--mut:#586070;--acc:#d93b1c;--rule:#d9dde3;--ibg:#11151a;--iink:#f4f5f6;--iacc:#ff7a5c;--imut:#a9b1bd}
+*{box-sizing:border-box}html{scroll-snap-type:y mandatory;scroll-behavior:smooth;background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 clamp(16px,1.5vw,21px)/1.5 Archivo,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.mono,code{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:.82em}
+.s{min-height:100vh;min-height:100dvh;scroll-snap-align:start;display:grid;grid-template-rows:auto 1fr;padding:clamp(20px,4vw,56px) clamp(20px,7vw,112px) clamp(84px,9vw,112px);border-bottom:1px solid var(--rule)}
+.s.inv{background:var(--ibg);color:var(--iink);border-color:transparent}
+.meta{display:flex;justify-content:space-between;margin:0;font:500 12px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+.inv .meta{color:var(--imut)}
+.body{align-self:center;max-width:1100px;width:100%}
+h1{font:800 clamp(34px,5.6vw,76px)/1.02 Archivo,"Helvetica Neue",Arial,sans-serif;letter-spacing:-.025em;margin:0 0 clamp(18px,3vw,40px)}
+h1.big{font-size:clamp(48px,11vw,150px);line-height:.95;letter-spacing:-.035em;margin-bottom:.25em}
+.kick{font:500 12px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase;color:var(--iacc);margin:0 0 20px}
+.tag{font-size:clamp(20px,2.6vw,34px);line-height:1.25;max-width:26em;margin:0 0 28px;color:var(--imut)}
+.who{margin:0 0 6px}.lnk{margin:0}
+a{color:inherit;text-decoration-thickness:1px;text-underline-offset:4px;text-decoration-color:var(--acc)}.inv a{text-decoration-color:var(--iacc)}
+a:hover,a:focus-visible{color:var(--acc)}.inv a:hover,.inv a:focus-visible{color:var(--iacc)}
+.lead{font-size:clamp(18px,2.1vw,28px);line-height:1.4;max-width:34em;margin:0 0 clamp(16px,2.4vw,32px)}
+.items{list-style:none;margin:0;padding:0;counter-reset:i;max-width:46em}
+.items li{counter-increment:i;display:grid;grid-template-columns:3.2em 1fr;gap:0 8px;padding:.7em 0;border-top:1px solid var(--rule);font-size:clamp(16px,1.7vw,23px);line-height:1.35}
+.items li:last-child{border-bottom:1px solid var(--rule)}
+.items li::before{content:counter(i,decimal-leading-zero);font:500 .62em/2.2 "IBM Plex Mono",ui-monospace,Menlo,monospace;color:var(--acc)}
+.facts{margin:0;max-width:52em}.facts div{display:grid;grid-template-columns:minmax(10em,16em) 1fr;gap:6px 20px;padding:.6em 0;border-top:1px solid var(--rule);align-items:baseline}
+.facts div:last-child{border-bottom:1px solid var(--rule)}
+.facts dt{font:500 12px/1.3 "IBM Plex Mono",ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}.facts dd{margin:0;overflow-wrap:anywhere}
+.lk{list-style:none;margin:0;padding:0;font-size:clamp(16px,1.8vw,24px)}.lk li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;padding:.55em 0;border-top:1px solid #ffffff33}
+.lk span{font:500 12px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase;color:var(--imut);min-width:7.5em}.lk code{overflow-wrap:anywhere}
+button,.nav a{font:500 13px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;color:inherit;background:transparent;border:1px solid currentColor;padding:8px 12px;cursor:pointer;text-decoration:none}
+button:hover,button:focus-visible{color:var(--acc)}.inv button:hover{color:var(--iacc)}
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px clamp(16px,4vw,48px);background:color-mix(in srgb,var(--bg) 92%,transparent);border-top:1px solid var(--rule);color:var(--ink);backdrop-filter:blur(6px)}
+.nav .grp{display:flex;gap:8px;align-items:center}.nav output{font:500 13px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;min-width:5em;text-align:center}
+.nav.on-inv{background:color-mix(in srgb,var(--ibg) 92%,transparent);color:var(--iink);border-color:#ffffff33}
+@media(max-width:640px){.facts div{grid-template-columns:1fr}.meta span:last-child{display:none}.nav .home{display:none}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{.nav{display:none}.s{min-height:auto;height:100vh;break-after:page}html{scroll-snap-type:none}}
+</style></head><body>
+<main><section class="s s-title inv" id="s1" aria-label="Slide 1 of 6"><p class="meta"><span>01 / 06</span><span>www.bchblaze.cash</span></p><div class="body"><p class="kick">BCH BLAZE 2026</p><h1 class="big">Teller</h1><p class="tag">Atomic swaps between PUSD and MUSD on Bitcoin Cash and USDC on Base, filled from a funded desk</p><p class="who">Team passionate-dev7</p><p class="lnk"><a href="https://github.com/passionate-dev7/teller-bridge" rel="noopener">github.com/passionate-dev7/teller-bridge</a></p></div></section>
+<section class="s s-story" id="s2" aria-label="Slide 2 of 6"><p class="meta"><span>02 / 06</span><span>www.bchblaze.cash</span></p><div class="body"><h1>The Story of Teller</h1><p class="lead">Moving a stablecoin between Bitcoin Cash and Base meant a bridge, a custodian or a size limit. Teller is a desk with owned inventory. The card shows what the desk can fill right now, per direction, read from the desk wallets. A swap up to that number is atomic: the user coins sit in a hash-timelock on one chain, the desk coins sit in a hash-timelock on the other, and one 32-byte secret opens both. Above it, a live NEAR Intents quote, so no size fails.</p></div></section>
+<section class="s s-list" id="s3" aria-label="Slide 3 of 6"><p class="meta"><span>03 / 06</span><span>www.bchblaze.cash</span></p><div class="body"><h1>Benefits of Teller</h1><ol class="items"><li>0.50 PUSD to USDC takes one WizardConnect signature, no Base wallet and no Base gas</li><li>USDC to PUSD needs no BCH signature: the desk relays the claim and it settles in one block</li><li>Live inventory on the card: &quot;fills up to&quot; per direction, read from the desk wallets</li><li>Non-custody by construction: if the desk stalls, both locks refund to the user</li><li>70 node tests and 16 forge tests pass, 14 covenant and 18 Base contract mutants killed</li><li>Past swaps replay from the desk record, every leg linked to its explorer</li></ol></div></section>
+<section class="s s-bch" id="s4" aria-label="Slide 4 of 6"><p class="meta"><span>04 / 06</span><span>www.bchblaze.cash</span></p><div class="body"><h1>BCH Usage</h1><p class="lead">The SwapLock covenant holds PUSD and MUSD CashTokens: one input, one output, claim pays exactly the recipient, refund only after the timeout. WizardConnect signs the lock. Recorded chipnet swaps in both directions:</p><dl class="facts"><div><dt>PUSD category</dt><dd><span class="mono">2469acc5afa4…e2a02544</span></dd></div><div><dt>PUSD to USDC, user lock</dt><dd><a class="mono" href="https://chipnet.imaginary.cash/tx/321689e4d2bf425899d1dee908fe02b8a209a8fb00e9dbb073b0662cda5e6e6b" rel="noopener" title="321689e4d2bf425899d1dee908fe02b8a209a8fb00e9dbb073b0662cda5e6e6b">321689e4d2…da5e6e6b</a></dd></div><div><dt>PUSD to USDC, desk claim</dt><dd><a class="mono" href="https://chipnet.imaginary.cash/tx/a84020126aad146e637cc49195510eef785d2d80d60224b99ef7f38c7cea6b05" rel="noopener" title="a84020126aad146e637cc49195510eef785d2d80d60224b99ef7f38c7cea6b05">a84020126a…7cea6b05</a></dd></div><div><dt>USDC to PUSD, user payout</dt><dd><a class="mono" href="https://chipnet.imaginary.cash/tx/c2843a8f47a58932ca72769fbb1bbf74a96841e79c10100e6a9fc53c5125f264" rel="noopener" title="c2843a8f47a58932ca72769fbb1bbf74a96841e79c10100e6a9fc53c5125f264">c2843a8f47…5125f264</a></dd></div><div><dt>Refund path, user made whole</dt><dd><a class="mono" href="https://chipnet.imaginary.cash/tx/4e300792f2855866e6345a235ff50b125dd7e354f5518b8643e71423375784d7" rel="noopener" title="4e300792f2855866e6345a235ff50b125dd7e354f5518b8643e71423375784d7">4e300792f2…375784d7</a></dd></div></dl></div></section>
+<section class="s s-vision" id="s5" aria-label="Slide 5 of 6"><p class="meta"><span>05 / 06</span><span>www.bchblaze.cash</span></p><div class="body"><h1>The Vision for Teller</h1><p class="lead">A stablecoin crosses chains with one secret and one signature, filled from a desk anyone can read.</p><ol class="items"><li>Abstraction increases: two chains, one 32-byte secret, one swap</li><li>Next priority -&gt; more pairs, the desk lists every pair it can fill</li><li>Target: any size, any pair, atomic from the desk or routed live</li></ol></div></section>
+<section class="s s-thanks inv" id="s6" aria-label="Slide 6 of 6"><p class="meta"><span>06 / 06</span><span>www.bchblaze.cash</span></p><div class="body"><h1 class="big">THANK YOU!</h1><ul class="lk"><li><span>Source</span><a href="https://github.com/passionate-dev7/teller-bridge" rel="noopener">github.com/passionate-dev7/teller-bridge</a></li><li><span>Live</span><a href="https://teller-bridge.vercel.app" rel="noopener">teller-bridge.vercel.app</a></li><li><span>Slides</span><a href="/deck.pdf">teller-bridge.vercel.app/deck.pdf</a></li><li><span>EMBER2026</span><code id="ad">bitcoincash:zpk40ajqg0a2kxxrnqn3xgha6taycv0gus5enyzugj</code><button type="button" id="cp">Copy</button></li></ul></div></section></main>
+<nav class="nav" id="nav" aria-label="Slides"><div class="grp"><button type="button" id="prev" aria-label="Previous slide">Prev</button><output id="pos" aria-live="polite">1 / 6</output><button type="button" id="next" aria-label="Next slide">Next</button></div><div class="grp"><a class="home" href="/">Open the app</a><a href="/deck.pdf">PDF</a></div></nav>
+<script>(function(){var s=[].slice.call(document.querySelectorAll('.s')),n=s.length,i=0,pos=document.getElementById('pos'),nav=document.getElementById('nav');
+function go(k){k=Math.max(0,Math.min(n-1,k));s[k].scrollIntoView();}
+function upd(k){i=k;pos.textContent=(k+1)+' / '+n;nav.classList.toggle('on-inv',s[k].classList.contains('inv'));history.replaceState(null,'','#'+(k+1));}
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)upd(s.indexOf(e.target))})},{threshold:.55});s.forEach(function(x){io.observe(x)});
+document.getElementById('prev').onclick=function(){go(i-1)};document.getElementById('next').onclick=function(){go(i+1)};
+addEventListener('keydown',function(e){if(e.target.closest&&e.target.closest('button,a'))if(e.key===' '||e.key==='Enter')return;
+var k={ArrowRight:i+1,ArrowDown:i+1,PageDown:i+1,' ':e.shiftKey?i-1:i+1,ArrowLeft:i-1,ArrowUp:i-1,PageUp:i-1,Home:0,End:n-1}[e.key];if(k===undefined||e.metaKey||e.ctrlKey||e.altKey)return;e.preventDefault();go(k)});
+var h=parseInt(location.hash.slice(1),10);if(h>1&&h<=n){s[h-1].scrollIntoView({behavior:'instant'})}
+var cp=document.getElementById('cp');cp.onclick=function(){var t=document.getElementById('ad').textContent,d=function(){cp.textContent='Copied';setTimeout(function(){cp.textContent='Copy'},1600)};navigator.clipboard?navigator.clipboard.writeText(t).then(d,d):d()};})();</script>
+</body></html>
