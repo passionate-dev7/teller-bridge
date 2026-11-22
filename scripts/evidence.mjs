@@ -26,12 +26,14 @@ const md = run('node', ['scripts/mutate-desk.mjs'], { maxBuffer: 1 << 26 });
 // the recorded swaps, read back from the chain
 const dbs = process.argv.slice(2);
 const chain = new ElectrumChain(Network.CHIPNET);
+/** a public Electrum server drops connections now and then: try a few times before saying a lookup failed */
+const retry = async (fn, n = 5) => { for (let i = 0; ; i++) { try { return await fn(); } catch (e) { if (i >= n - 1) throw e; await new Promise((r) => setTimeout(r, 3000)); } } };
 const swaps = dbs.flatMap((db) => new Store(db).recent(['done'], 50));
 const legs = [];
 for (const s of swaps) for (const [k, txid] of Object.entries(s.txs)) {
   if (!/^[0-9a-f]{64}$/.test(txid)) continue;
   let confs = 'n/a';
-  try { const t = await chain.performRequest('blockchain.transaction.get', txid, true); confs = String(t.confirmations ?? 0); } catch (e) { confs = 'lookup failed'; }
+  try { const t = await retry(() => chain.performRequest('blockchain.transaction.get', txid, true)); confs = String(t.confirmations ?? 0); } catch (e) { confs = 'lookup failed'; }
   legs.push('| ' + s.dir + ' | ' + k + ' | `' + txid + '` | ' + confs + ' |');
 }
 
@@ -39,8 +41,8 @@ for (const s of swaps) for (const [k, txid] of Object.entries(s.txs)) {
 const extraFile = root + 'docs/evidence/live-legs.json';
 const extra = [];
 if (existsSync(extraFile)) for (const { label, txid } of JSON.parse(readFileSync(extraFile, 'utf8'))) {
-  const raw = await chain.getRawTransaction(txid);
-  const info = await chain.performRequest('blockchain.transaction.get', txid, true);
+  const raw = await retry(() => chain.getRawTransaction(txid));
+  const info = await retry(() => chain.performRequest('blockchain.transaction.get', txid, true));
   const tx = decodeTransaction(hexToBin(raw));
   const outs = tx.outputs.map((o) => lockingBytecodeToCashAddress({ bytecode: o.lockingBytecode, prefix: 'bchtest', tokenSupport: true }).address + ' ' + (o.token ? o.token.amount + ' units' : 'no tokens')).join('; ');
   extra.push('- ' + label + '. `' + txid + '`, locktime ' + tx.locktime + ', ' + (info.confirmations ?? 0) + ' confirmations, pays ' + outs + '.');
