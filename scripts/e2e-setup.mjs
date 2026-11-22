@@ -27,7 +27,7 @@ let anvil;
 
 if (env.E2E_EVM === 'anvil') {
   const port = env.E2E_ANVIL_PORT ?? '8546';
-  anvil = spawn('anvil', ['--port', port, '--chain-id', '84532', '--silent'], { stdio: 'ignore' });
+  anvil = spawn('anvil', ['--port', port, '--chain-id', '84532', '--block-time', '1', '--silent'], { stdio: 'ignore' });
   await sleep(1500);
   env.BASE_RPC_URL = 'http://127.0.0.1:' + port;
   const dir = mkdtempSync(join(tmpdir(), 'e2e-'));
@@ -42,7 +42,7 @@ if (env.E2E_EVM === 'anvil') {
 Object.assign(process.env, { BASE_RPC_URL: env.BASE_RPC_URL ?? '', DEPLOYMENTS_FILE: env.DEPLOYMENTS_FILE ?? '' });
 if (!env.BASE_RPC_URL) delete process.env.BASE_RPC_URL;
 if (!env.DEPLOYMENTS_FILE) delete process.env.DEPLOYMENTS_FILE;
-process.env.DESK_DB = join(mkdtempSync(join(tmpdir(), 'e2e-db-')), 'desk.sqlite');
+process.env.DESK_DB ||= join(mkdtempSync(join(tmpdir(), 'e2e-db-')), 'desk.sqlite');
 process.env.POLL_MS = '3000';
 
 const { desk, cfg } = buildDesk(process.env);

@@ -17,7 +17,12 @@ const UI = process.env.UI_URL ?? 'http://127.0.0.1:5199/';
 const DESK = process.env.DESK_URL ?? 'http://127.0.0.1:8790';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
-const bh = (...args) => execFileSync('bhn', ['deepsurge', ...args], { encoding: 'utf8', timeout: 90000 });
+// the profile is shared with other sessions that also switch its active tab, so pin ours before every command
+let TAB = null;
+const bh = (...args) => {
+  if (TAB && args[0] !== 'open' && args[0] !== 'tabs' && args[0] !== 'use') execFileSync('bhn', ['deepsurge', 'use', TAB], { encoding: 'utf8', timeout: 30000 });
+  return execFileSync('bhn', ['deepsurge', ...args], { encoding: 'utf8', timeout: 90000 });
+};
 const state = () => JSON.parse(bh('state', 'compact')).state;
 const refOf = (st, tag, startsWith) => st.elements.find((e) => e.tag === tag && e.name.startsWith(startsWith))?.ref;
 const mainText = () => { try { return JSON.parse(bh('text', 'main', '4000')).text; } catch { return ''; } };
@@ -56,6 +61,7 @@ bh('eval', "localStorage.clear(); location.reload()");
 await sleep(3000);
 const tabs = JSON.parse(bh('tabs')).tabs;
 const mine = tabs.find((t) => t.url.startsWith(UI.replace(/\/$/, '')));
+TAB = mine.targetId;
 bh('use', mine.targetId);
 const result = { tab: mine.targetId };
 try {

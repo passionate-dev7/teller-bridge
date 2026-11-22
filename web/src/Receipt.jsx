@@ -69,6 +69,7 @@ export default function Receipt({ swap, status, local, replay, title }) {
   const pending = shown !== null || ['done', 'refunded', 'expired', 'abandoned'].includes(swap.state) ? [] : PENDING[swap.dir].filter((k) => !seen.has(k));
   const link = (l) => {
     if (!l.txid) return null;
+    if (l.chain === 'evm' && swap.localEvm) return <span className="tx" title="Base leg ran on a local node, there is no public explorer for it">{short(l.txid, 8, 6)} (local node)</span>;
     const base = l.chain === 'bch' ? status.bch.explorerTx : status.evm.explorerTx;
     return <a className="tx" href={base + l.txid} target="_blank" rel="noreferrer">{short(l.txid, 8, 6)}</a>;
   };

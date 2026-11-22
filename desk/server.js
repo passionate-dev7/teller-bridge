@@ -44,7 +44,9 @@ export function createServer(desk, { oneClick = oneClickQuote, peg = pegQuote } 
   const limited = (ip) => { const now = Date.now(); const h = (hits.get(ip) ?? []).filter((t) => now - t < 60_000); h.push(now); hits.set(ip, h); return h.length > 120; };
   let statusCache = { at: 0, body: null };
   return http.createServer(async (req, res) => {
-    const ip = req.socket.remoteAddress ?? 'x';
+    // behind a tunnel or proxy the socket address is the proxy: TRUST_PROXY=1 reads the forwarded client address instead
+    const fwd = process.env.TRUST_PROXY === '1' ? String(req.headers['cf-connecting-ip'] ?? req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() : '';
+    const ip = fwd || req.socket.remoteAddress || 'x';
     try {
       if (req.method === 'OPTIONS') return json(res, 204, {});
       if (limited(ip)) return json(res, 429, { error: 'rate_limited' });
