@@ -115,6 +115,9 @@ export default function App() {
 
   const finish = () => { setTrack(null); setSwap(null); setError(null); };
 
+  // what the paired wallet holds: the lock needs the tokens plus a few thousand sats of plain BCH for fees
+  const held = (bch.scan?.inputs ?? []).reduce((a, i) => (i.utxo.token ? (i.utxo.token.category === pair?.category && !i.utxo.token.nft ? { ...a, tokens: a.tokens + i.utxo.token.amount } : a) : { ...a, sats: a.sats + i.utxo.satoshis }), { tokens: 0n, sats: 0n });
+
   // primary button
   let action = { label: 'Loading the desk', disabled: true };
   if (status) {
@@ -124,6 +127,8 @@ export default function App() {
     else if (!status.ready) action = { label: 'Desk is refilling', disabled: true };
     else if (dir === 'bch2base' && !bch.paired) action = { label: 'Connect your Bitcoin Cash wallet', onClick: () => { bch.wc.connect(); setPairOpen(true); } };
     else if (dir === 'bch2base' && !bch.scan) action = { label: 'Reading your wallet', disabled: true };
+    else if (dir === 'bch2base' && held.tokens < cents) action = { label: 'This wallet holds ' + money(held.tokens, 2) + ' ' + pair.symbol, disabled: true };
+    else if (dir === 'bch2base' && held.sats < 6500n) action = { label: 'Add about 0.0001 BCH for network fees', disabled: true };
     else if (dir === 'bch2base' && !isAddress(baseTarget)) action = { label: 'Add the Base address to pay', disabled: true };
     else if (dir === 'base2bch' && !evm.isConnected) action = { label: 'Connect your Base wallet', onClick: () => document.getElementById('evm-connect')?.scrollIntoView({ block: 'center' }) };
     else if (dir === 'base2bch' && !bchOk) action = { label: 'Add the Bitcoin Cash address to pay', disabled: true };
@@ -219,7 +224,7 @@ export default function App() {
                     <dl>
                       <dt>You lock</dt><dd>{money(cents, 2)} {sendSym}</dd>
                       <dt>You get</dt><dd>{money(recv, dir === 'bch2base' ? 6 : 2, 2)} {recvSym}</dd>
-                      {dir === 'bch2base' && <><dt>Desk answers</dt><dd>{cents > BigInt(status.zeroConfMaxCents) ? 'after one block, about 10 min' : 'within seconds'}</dd></>}
+                      {dir === 'bch2base' && <><dt>Desk answers</dt><dd>{cents > BigInt(status.zeroConfMaxCents ?? 2500) ? 'after one block, about 10 min' : 'within seconds'}</dd></>}
                       <dt>If the desk never answers</dt><dd>refund after {hours(dir === 'bch2base' ? status.windows.userBchWindow : status.windows.userEvmWindow)}</dd>
                     </dl>
                   </div>
