@@ -67,3 +67,15 @@ export async function overflowQuote(query) {
 }
 
 export const oneClickQuote = (query) => overflowQuote(query);
+
+/** What 1 PUSD sells for on Cauldron right now, in USD, with its source: Cauldron router sats times the 1Click BCH price. */
+export async function pegQuote() {
+  const [leg, tokens] = await Promise.all([
+    routerQuote({ sell: PUSD_CATEGORY, buy: 'bch', amount: 100, side: 'sell' }),
+    fetch(ONECLICK + '/tokens').then((r) => r.json()),
+  ]);
+  const bch = tokens.find((t) => t.assetId === BCH_ASSET);
+  if (!bch) throw new Error('no BCH price');
+  const usd = (Number(leg.output_amount) / 1e8) * bch.price;
+  return { symbol: 'PUSD', usd: Math.round(usd * 10000) / 10000, bchUsd: bch.price, bchPriceAt: bch.priceUpdatedAt, quotedAt: Math.floor(Date.now() / 1000), source: 'Cauldron router sale of 1.00 PUSD, BCH priced by NEAR Intents' };
+}

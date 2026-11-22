@@ -49,6 +49,8 @@ export default function App() {
   const [swap, setSwap] = useState(null);
   const [past, setPast] = useState([]);
   const [replayOf, setReplayOf] = useState(null);
+  const [peg, setPeg] = useState(null);
+  useEffect(() => { api.peg().then(setPeg).catch(() => setPeg(null)); }, [api]);
 
   const pair = status?.pairs.find((p) => p.symbol === pairSym) ?? status?.pairs[0];
   const cents = parseCents(amount);
@@ -243,7 +245,7 @@ export default function App() {
           )}
         </section>
 
-        <Drawers pair={pair} dir={dir} wantRecv={recv ? recv.toString() : null} over={over} />
+        <Drawers pair={pair} dir={dir} wantRecv={recv ? recv.toString() : null} over={over} peg={peg} />
 
         <div className="receipt-wrap">
           {track && swap && status && <Receipt swap={swap} status={status} local={track} title="your receipt" />}

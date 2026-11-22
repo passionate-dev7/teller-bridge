@@ -1,6 +1,6 @@
 import { money } from './format.js';
 
-function Drawer({ cls, title, chain, inventory, available, decimals, unit, want, over, pays }) {
+function Drawer({ cls, title, chain, inventory, available, decimals, unit, want, over, pays, note }) {
   const inv = BigInt(inventory), av = BigInt(available);
   const pct = (x) => (inv > 0n ? Math.min(100, Number((x * 10000n) / inv) / 100) : 0);
   const w = want ? BigInt(want) : 0n;
@@ -22,13 +22,14 @@ function Drawer({ cls, title, chain, inventory, available, decimals, unit, want,
       </div>
       <div className="legend">
         <span>fills up to <b>{money(av, decimals, 2)} {unit}</b> right now</span>
+        {note && <span>{note}</span>}
         <span>holds <b>{money(inv, decimals, 2)} {unit}</b>{inv > av ? ', ' + money(inv - av, decimals, 2) + ' reserved by open quotes' : ''}</span>
       </div>
     </section>
   );
 }
 
-export default function Drawers({ pair, dir, wantRecv, over }) {
+export default function Drawers({ pair, dir, wantRecv, over, peg }) {
   if (!pair) return (
     <div className="drawers" aria-busy="true">
       <div className="drawer"><div className="skeleton" style={{ height: 380 }} /></div>
@@ -38,7 +39,8 @@ export default function Drawers({ pair, dir, wantRecv, over }) {
   return (
     <div className="drawers">
       <Drawer cls="bch" title={pair.symbol.toLowerCase()} chain="Bitcoin Cash" unit={pair.symbol} decimals={2}
-        inventory={pair.inventory.bchUnits} available={pair.available.bchUnits} pays={dir === 'base2bch'} want={dir === 'base2bch' ? wantRecv : null} over={over} />
+        inventory={pair.inventory.bchUnits} available={pair.available.bchUnits} pays={dir === 'base2bch'} want={dir === 'base2bch' ? wantRecv : null} over={over}
+        note={peg && pair.symbol === 'PUSD' ? 'Cauldron pays $' + peg.usd.toFixed(4) + ' per PUSD now. The desk pays $1.0000 less its fee.' : null} />
       <Drawer cls="base" title="usdc" chain="Base" unit="USDC" decimals={6}
         inventory={pair.inventory.usdcUnits} available={pair.available.usdcUnits} pays={dir === 'bch2base'} want={dir === 'bch2base' ? wantRecv : null} over={over} />
     </div>

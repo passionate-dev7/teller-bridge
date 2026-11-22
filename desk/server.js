@@ -8,7 +8,7 @@ import { Store } from './store.js';
 import { BchDesk, EvmDesk, ElectrumChain } from './chains.js';
 import { clients } from '../lib/evm.js';
 import { NETWORKS, rulesFromEnv } from '../lib/config.js';
-import { oneClickQuote } from './overflow.js';
+import { oneClickQuote, pegQuote } from './overflow.js';
 
 const USDC = { 8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' };
 
@@ -38,7 +38,8 @@ const readBody = (req) => new Promise((resolve, reject) => {
   req.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString() || '{}')); } catch { reject(new DeskError('bad_request', 'invalid JSON')); } });
 });
 
-export function createServer(desk, { oneClick = oneClickQuote } = {}) {
+export function createServer(desk, { oneClick = oneClickQuote, peg = pegQuote } = {}) {
+  let pegCache = { at: 0, body: null };
   const hits = new Map();
   const limited = (ip) => { const now = Date.now(); const h = (hits.get(ip) ?? []).filter((t) => now - t < 60_000); h.push(now); hits.set(ip, h); return h.length > 120; };
   let statusCache = { at: 0, body: null };
@@ -57,6 +58,10 @@ export function createServer(desk, { oneClick = oneClickQuote } = {}) {
       if (req.method === 'GET' && m && !m[2]) { const s = desk.getSwap(m[1]); return s ? json(res, 200, s) : json(res, 404, { error: 'not_found' }); }
       if (req.method === 'POST' && m && m[2]) { const b = await readBody(req); return json(res, 200, await desk.reveal(m[1], b.secret)); }
       if (req.method === 'GET' && url.pathname === '/api/replays') return json(res, 200, desk.recentDone(20));
+      if (req.method === 'GET' && url.pathname === '/api/peg') {
+        if (Date.now() - pegCache.at > 60_000) pegCache = { at: Date.now(), body: await peg() };
+        return json(res, 200, pegCache.body);
+      }
       if (req.method === 'GET' && url.pathname === '/api/overflow/quote') return json(res, 200, await oneClick(Object.fromEntries(url.searchParams), desk.cfg));
       return json(res, 404, { error: 'not_found' });
     } catch (e) {
