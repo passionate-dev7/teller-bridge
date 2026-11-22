@@ -159,7 +159,7 @@ export default function App() {
       </div>
 
       <main className="board">
-        <section className="slip" aria-label="Swap">
+        <section className="slip panel" aria-label="Swap">
           {!track && (
             <>
               <div className="slip-row">

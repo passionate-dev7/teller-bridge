@@ -6,7 +6,7 @@ function Drawer({ cls, title, chain, inventory, available, decimals, unit, want,
   const w = want ? BigInt(want) : 0n;
   const ticks = [100, 75, 50, 25].map((p) => money((inv * BigInt(p)) / 100n, decimals, 0));
   return (
-    <section className={'drawer ' + cls + (pays ? ' pays' : '')} aria-label={title + ' drawer'}>
+    <section className={'drawer card ' + cls + (pays ? ' pays' : '')} aria-label={title + ' drawer'}>
       <div>
         <h3>{title}</h3>
         <div className="chain label">{chain}</div>

@@ -75,7 +75,7 @@ export default function Receipt({ swap, status, local, replay, title }) {
   };
   const last = all[all.length - 1];
   return (
-    <section className="receipt" aria-label="Swap receipt" aria-live="polite">
+    <section className="receipt panel" aria-label="Swap receipt" aria-live="polite">
       <div className="receipt-head">
         <h3>{title ?? 'receipt'}</h3>
         <span className={'chip ' + (swap.state === 'done' ? 'ok' : ['refunded', 'refund_wait', 'expired'].includes(swap.state) ? 'warn' : 'signal')}>{swap.state.replace('_', ' ')}</span>
