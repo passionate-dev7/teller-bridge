@@ -1,7 +1,7 @@
 // Live end-to-end run of the happy path in both directions against the real stack. usage: node --env-file=.env scripts/e2e-live.mjs
 // (E2E_EVM=anvil rehearses the Base leg on a local anvil that reports chain id 84532; otherwise the configured Base RPC is used.)
 import { setup } from './e2e-setup.mjs';
-import { lockBuilder } from '../lib/bch.js';
+import { lockBuilder, addressInputs } from '../lib/bch.js';
 import { randomSecret, checkQuote, bchContractFromQuote } from '../lib/client.js';
 import { fmtUsd } from '../lib/amounts.js';
 import { ERC20_ABI, DESK_LOCK_ABI } from '../lib/evm.js';
@@ -20,7 +20,7 @@ try {
     if (problems.length) throw new Error('quote check: ' + problems.join('; '));
     const t0 = Date.now();
     const contract = bchContractFromQuote(q, await api.status(), chain);
-    const lock = await (await lockBuilder({ provider: chain, contract, category, tokenAmount: BigInt(sendUnits), from: userBchAddr, fromPrefix: net.bch.prefix, signer: { keyHex: env.TEST_USER_BCH_KEY } })).send();
+    const lock = await lockBuilder({ provider: chain, contract, category, tokenAmount: BigInt(sendUnits), inputs: await addressInputs(chain, userBchAddr, { keyHex: env.TEST_USER_BCH_KEY }), changeTo: R.userA[net.bch.network === 'mainnet' ? 'mainnetTokens' : 'chipnetTokens'] }).send();
     log('A user locked 0.50 PUSD on BCH', lock.txid);
     const locked = await waitFor(q.id, ['desk_locked']);
     log('A desk locked USDC on Base', locked.txs.deskLock, 'after', (Date.now() - t0) / 1000, 's');

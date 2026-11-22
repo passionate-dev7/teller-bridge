@@ -10,7 +10,7 @@ import { BchDesk, EvmDesk, MemoryChain } from '../desk/chains.js';
 import { clients, DESK_LOCK_ABI, DESK_LOCK_BYTECODE, ERC20_ABI, lockId } from '../lib/evm.js';
 import { DEFAULT_RULES, NETWORKS } from '../lib/config.js';
 import { addressesOf } from '../lib/keys.js';
-import { swapLock, lockBuilder, claimBuilder, lockingBytecodeOf, sha256Hex } from '../lib/bch.js';
+import { swapLock, lockBuilder, addressInputs, tokenAddressOf, claimBuilder, lockingBytecodeOf, sha256Hex } from '../lib/bch.js';
 import testUsdc from '../contracts/evm/TestUSDC.json' with { type: 'json' };
 
 export const CATEGORY = NETWORKS.testnet.pairs[0].category;
@@ -98,8 +98,8 @@ export async function rig({ rules = {} } = {}) {
     bchContract: (q) => swapLock({ hashlock: q.hashlock, recipientLock: q.dir === 'bch2base' ? bch.lockingHex : q.userBchLock, refundLock: q.dir === 'bch2base' ? q.userBchLock : bch.lockingHex, refundTime: q.bchRefundTime }, chain),
     async lockBch(q) {
       const contract = user.bchContract(q);
-      const b = await lockBuilder({ provider: chain, contract, category: CATEGORY, tokenAmount: BigInt(q.sendUnits), from: userBch.chipnet, fromPrefix: 'bchtest', signer: { keyHex: userBchKey } });
-      return (await b.send()).txid;
+      const inputs = await addressInputs(chain, userBch.chipnet, { keyHex: userBchKey });
+      return (await lockBuilder({ provider: chain, contract, category: CATEGORY, tokenAmount: BigInt(q.sendUnits), inputs, changeTo: userBch.chipnetTokens }).send()).txid;
     },
     async lockUsdc(q) {
       const w = userEvm.walletClient;

@@ -220,6 +220,24 @@ test('base2bch: the user claim window outlives the desk refund by the configured
   assert.ok(q.evmTimeout - s.bchRefundTime >= r.rules.evmOverlap, 'Base timeout at least evmOverlap after the BCH refund time');
 });
 
+test('base2bch: a lock that lands after the quote expired is never answered on BCH, and the user is refunded', async () => {
+  const r = await fresh();
+  await r.user.fundUsdc(5_000_000n);
+  const { hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'base2bch', sendUnits: '1000000', hashlock });
+  await r.warp(r.rules.quoteTtl + 1);
+  await r.tick();
+  assert.equal(r.swap(q.id).state, 'expired');
+  await r.user.lockUsdc(q);
+  await r.tick();
+  assert.equal(r.swap(q.id).state, 'refund_wait');
+  assert.equal(await r.deskTokens(), 100_000n, 'no BCH lock was made');
+  await r.warp(q.evmTimeout - r.clock() + 5);
+  await r.tick();
+  assert.equal(r.swap(q.id).state, 'refunded');
+  assert.equal(await r.user.usdc(), 5_000_000n);
+});
+
 test('base2bch: a lock that is too close to the Base timeout is not answered', async () => {
   const r = await fresh({ rules: { quoteTtl: 6 * H } });
   await r.user.fundUsdc(5_000_000n);

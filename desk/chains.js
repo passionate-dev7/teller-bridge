@@ -2,7 +2,7 @@
 // chipnet / Base Sepolia / mainnet; tests swap in an in-memory BCH validator and a local anvil node.
 import { ElectrumNetworkProvider, MockNetworkProvider } from 'cashscript';
 import { binToHex, hexToBin, sha256 as libauthSha256, decodeTransactionUnsafe } from '@bitauth/libauth';
-import { swapLock, fundedLocks, lockBuilder, claimBuilder, refundBuilder, lockingBytecodeOf, medianTimePast, secretFromClaimTx, tokenAddressOf } from '../lib/bch.js';
+import { swapLock, fundedLocks, lockBuilder, addressInputs, claimBuilder, refundBuilder, lockingBytecodeOf, medianTimePast, secretFromClaimTx, tokenAddressOf } from '../lib/bch.js';
 import { addressesOf } from '../lib/keys.js';
 import { DESK_LOCK_ABI, ERC20_ABI, LOCK_STATE, lockId } from '../lib/evm.js';
 import { parseAbiItem } from 'viem';
@@ -66,7 +66,8 @@ export class BchDesk {
   }
 
   async lock(s) {
-    const b = await lockBuilder({ provider: this.provider, contract: this.contract(s), category: s.category, tokenAmount: BigInt(s.recvUnits), from: this.address, fromPrefix: this.prefix, signer: { keyHex: this.keyHex } });
+    const inputs = await addressInputs(this.provider, this.address, { keyHex: this.keyHex });
+    const b = lockBuilder({ provider: this.provider, contract: this.contract(s), category: s.category, tokenAmount: BigInt(s.recvUnits), inputs, changeTo: this.tokenAddress() });
     return (await b.send()).txid;
   }
 

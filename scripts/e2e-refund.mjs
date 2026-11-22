@@ -2,7 +2,7 @@
 // BCH judges a time-based locktime by the median time past (about an hour behind the wall clock), so the BCH refund
 // arrives roughly 60 to 80 minutes after the lock. usage: node --env-file=.env scripts/e2e-refund.mjs
 import { setup } from './e2e-setup.mjs';
-import { lockBuilder } from '../lib/bch.js';
+import { lockBuilder, addressInputs } from '../lib/bch.js';
 import { randomSecret, checkQuote, bchContractFromQuote } from '../lib/client.js';
 import { ERC20_ABI, DESK_LOCK_ABI } from '../lib/evm.js';
 
@@ -18,7 +18,7 @@ try {
   const reqA = { dir: 'bch2base', pair: 'PUSD', sendUnits: '30', hashlock: a.hashlock, userBchAddress: userBchAddr, userEvm: userEvm.account.address };
   const qA = await api.quote(reqA);
   if (checkQuote(qA, { ...reqA, userBchLock }, await api.status(), Math.floor(Date.now() / 1000), chain).length) throw new Error('quote A');
-  const lockA = await (await lockBuilder({ provider: chain, contract: bchContractFromQuote(qA, await api.status(), chain), category, tokenAmount: 30n, from: userBchAddr, fromPrefix: net.bch.prefix, signer: { keyHex: env.TEST_USER_BCH_KEY } })).send();
+  const lockA = await lockBuilder({ provider: chain, contract: bchContractFromQuote(qA, await api.status(), chain), category, tokenAmount: 30n, inputs: await addressInputs(chain, userBchAddr, { keyHex: env.TEST_USER_BCH_KEY }), changeTo: R.userA[net.bch.network === 'mainnet' ? 'mainnetTokens' : 'chipnetTokens'] }).send();
   log('A user locked 0.30 PUSD', lockA.txid, 'refund time', qA.bchRefundTime);
 
   // B: USDC -> PUSD, user locks USDC, never reveals
