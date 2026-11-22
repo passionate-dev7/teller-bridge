@@ -76,7 +76,7 @@ export class Desk {
       minUsdCents: Number(this.rules.minUsdCents),
       quoteTtl: this.rules.quoteTtl,
       bch: { ...this.cfg.bch, deskAddress: this.bch.tokenAddress(), deskLock: this.bch.lockingHex },
-      evm: { ...this.cfg.evm, deskLock: this.evm.deskLock, token: this.evm.token, deskAddress: this.evm.address },
+      evm: { chainId: this.cfg.evm.chainId, name: this.cfg.evm.name, explorerTx: this.cfg.evm.explorerTx, explorerAddr: this.cfg.evm.explorerAddr, deskLock: this.evm.deskLock, token: this.evm.token, deskAddress: this.evm.address },
       windows: { userBchWindow: this.rules.userBchWindow, deskEvmWindow: this.rules.deskEvmWindow, userEvmWindow: this.rules.userEvmWindow, deskBchWindow: this.rules.deskBchWindow },
       pairs: cap.pairs,
     };

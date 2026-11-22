@@ -26,9 +26,10 @@ const out = { scenarios: [] };
 let anvil;
 
 if (env.E2E_EVM === 'anvil') {
-  anvil = spawn('anvil', ['--port', '8546', '--chain-id', '84532', '--silent'], { stdio: 'ignore' });
+  const port = env.E2E_ANVIL_PORT ?? '8546';
+  anvil = spawn('anvil', ['--port', port, '--chain-id', '84532', '--silent'], { stdio: 'ignore' });
   await sleep(1500);
-  env.BASE_RPC_URL = 'http://127.0.0.1:8546';
+  env.BASE_RPC_URL = 'http://127.0.0.1:' + port;
   const dir = mkdtempSync(join(tmpdir(), 'e2e-'));
   env.DEPLOYMENTS_FILE = join(dir, 'deployments.json');
   writeFileSync(env.DEPLOYMENTS_FILE, '{}');
@@ -94,7 +95,7 @@ const userUsdc = () => userEvm.publicClient.readContract({ address: token, abi: 
 await desk.evm.ensureAllowance();
 const tickTimer = setInterval(() => desk.tick().catch((e) => console.error('tick', e.message)), 3000);
 const server = createServer(desk);
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
+await new Promise((r) => server.listen(Number(process.env.DESK_PORT ?? 0), '127.0.0.1', r));
 const api = deskApi('http://127.0.0.1:' + server.address().port);
 const status = await api.status();
 log('desk ready', status.ready, 'inventory', JSON.stringify(status.pairs[0].inventory), 'maxSend', JSON.stringify(status.pairs[0].maxSend));
