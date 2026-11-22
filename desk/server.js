@@ -25,7 +25,9 @@ export function buildDesk(env = process.env) {
   mkdirSync(new URL('../data/', import.meta.url), { recursive: true });
   const store = new Store(env.DESK_DB ?? new URL('../data/desk-' + net.name + '.sqlite', import.meta.url).pathname);
   const cfg = { name: net.name, bch: net.bch, evm: evmInfo, pairs: net.pairs, rules: rulesFromEnv(env) };
-  return { desk: new Desk({ cfg, bch, evm, store, log: (...a) => console.error('[desk]', ...a) }), cfg };
+  // on mainnet the desk reads the Cauldron price of each stable and refuses quotes off par; testnet tokens have no market
+  const peg = net.name === 'mainnet' ? (symbol) => pegQuote(net.pairs.find((p) => p.symbol === symbol).category).then((p) => p.usd) : undefined;
+  return { desk: new Desk({ cfg, bch, evm, store, peg, log: (...a) => console.error('[desk]', ...a) }), cfg };
 }
 
 const json = (res, code, body) => {
@@ -38,15 +40,39 @@ const readBody = (req) => new Promise((resolve, reject) => {
   req.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString() || '{}')); } catch { reject(new DeskError('bad_request', 'invalid JSON')); } });
 });
 
+/**
+ * The address a request counts against. A forwarded-for header is believed only when TRUST_PROXY is a hop count and the
+ * socket peer is a local proxy (cloudflared on this host); then the entry that many hops from the right is used.
+ */
+export function clientIp(req, trustProxy = process.env.TRUST_PROXY) {
+  const peer = req.socket.remoteAddress ?? 'x';
+  const hops = Number(trustProxy);
+  if (!Number.isInteger(hops) || hops < 1 || !/^(::1|127\.|::ffff:127\.)/.test(peer)) return peer;
+  const list = String(req.headers['x-forwarded-for'] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return list.length >= hops ? list[list.length - hops] : peer;
+}
+
+/** limited(key) is true once `key` has made more than `limit` calls inside `windowMs`. Old keys are dropped, the map is capped. */
+export function rateLimiter({ limit = 120, windowMs = 60_000, maxKeys = 10_000 } = {}) {
+  const hits = new Map();
+  const limited = (key, now = Date.now()) => {
+    const h = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
+    h.push(now);
+    hits.delete(key);
+    hits.set(key, h);
+    if (hits.size > maxKeys) for (const k of hits.keys()) { if (hits.size <= maxKeys) break; hits.delete(k); }
+    return h.length > limit;
+  };
+  limited.size = () => hits.size;
+  return limited;
+}
+
 export function createServer(desk, { oneClick = oneClickQuote, peg = pegQuote } = {}) {
   let pegCache = { at: 0, body: null };
-  const hits = new Map();
-  const limited = (ip) => { const now = Date.now(); const h = (hits.get(ip) ?? []).filter((t) => now - t < 60_000); h.push(now); hits.set(ip, h); return h.length > 120; };
+  const limited = rateLimiter();
   let statusCache = { at: 0, body: null };
   return http.createServer(async (req, res) => {
-    // behind a tunnel or proxy the socket address is the proxy: TRUST_PROXY=1 reads the forwarded client address instead
-    const fwd = process.env.TRUST_PROXY === '1' ? String(req.headers['cf-connecting-ip'] ?? req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() : '';
-    const ip = fwd || req.socket.remoteAddress || 'x';
+    const ip = clientIp(req);
     try {
       if (req.method === 'OPTIONS') return json(res, 204, {});
       if (limited(ip)) return json(res, 429, { error: 'rate_limited' });
@@ -78,6 +104,7 @@ if (import.meta.url === 'file://' + process.argv[1]) {
   // a public Electrum server dropping a socket rejects inside the client library: log it, keep the desk running
   process.on('unhandledRejection', (e) => console.error('[desk] unhandled rejection:', e?.message ?? e));
   const { desk } = buildDesk();
+  await desk.evm.verifyDeployment(); // the deployed DeskLock must hold the pinned token
   const approval = await desk.evm.ensureAllowance();
   if (approval) console.error('[desk] approved DeskLock for USDC', approval.hash);
   setInterval(() => desk.tick().catch((e) => console.error('[tick]', e.message)), desk.rules.pollMs);

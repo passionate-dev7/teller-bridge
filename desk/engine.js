@@ -21,8 +21,9 @@ export class DeskError extends Error {
 const isHex = (s, n) => typeof s === 'string' && new RegExp('^[0-9a-f]{' + n + '}$').test(s);
 
 export class Desk {
-  constructor({ cfg, bch, evm, store, clock = () => Math.floor(Date.now() / 1000), log = () => {} }) {
-    Object.assign(this, { cfg, bch, evm, store, clock, log });
+  constructor({ cfg, bch, evm, store, peg, clock = () => Math.floor(Date.now() / 1000), log = () => {} }) {
+    Object.assign(this, { cfg, bch, evm, store, clock, log, peg });
+    this.pegCache = new Map();
     this.rules = cfg.rules;
     this.busy = false;
     this.locks = new Map();
@@ -110,6 +111,7 @@ export class Desk {
     const recv = dir === 'bch2base' ? bchToBaseOut(send, this.rules.feeBps) : baseToBchOut(send, this.rules.feeBps);
     if (recv <= 0n) throw new DeskError('below_min', 'amount too small');
 
+    await this.#checkPeg(pair.symbol);
     const active = this.store.inStates(ACTIVE);
     if (active.length >= this.rules.maxActive) throw new DeskError('busy', 'desk has too many open swaps, try again shortly');
     if (active.filter((s) => s.ip === ip).length >= this.rules.maxActivePerIp) throw new DeskError('busy', 'too many open quotes from your address');
@@ -132,6 +134,18 @@ export class Desk {
     this.#ev(s, 'quoted');
     this.store.insert(s);
     return this.view(s);
+  }
+
+  /** the desk pays at par: off by more than 1 percent either way, or unreadable, no new quotes (fail closed) */
+  async #checkPeg(symbol) {
+    if (!this.peg) return;
+    const now = this.clock();
+    let hit = this.pegCache.get(symbol);
+    if (!hit || now - hit.at > 60) {
+      try { hit = { at: now, usd: await this.peg(symbol) }; } catch { throw new DeskError('peg', 'the ' + symbol + ' price cannot be read right now, try again shortly'); }
+      this.pegCache.set(symbol, hit);
+    }
+    if (!(Math.abs(hit.usd - 1) <= 0.01)) throw new DeskError('peg', symbol + ' trades at ' + Number(hit.usd).toFixed(4) + ' dollars, too far from par for the desk to quote');
   }
 
   view(s) {
@@ -229,6 +243,9 @@ export class Desk {
       if (l.state === LOCK_STATE.None) {
         const usdc = await this.evm.usdcBalance();
         if (usdc < BigInt(s.recvUnits)) { s.note = 'desk could not cover the payout'; return this.#move(s, 'refund_wait', 'desk_short'); }
+        // remember where to start reading Base logs BEFORE broadcasting: a crash or RPC error after the send must not lose it
+        s.evmLockBlock = await this.evm.blockNumber();
+        this.store.save(s);
         const r = await this.evm.lock({ recipient: s.userEvm, hashlock: s.hashlock, timeout: s.evmTimeout, amount: s.recvUnits });
         s.txs.deskLock = r.hash;
         s.evmLockBlock = Number(r.block);
@@ -240,6 +257,7 @@ export class Desk {
     if (s.state === 'desk_locked') {
       const l = await this.evm.lockState(s.evmLockId);
       if (!s.secret) {
+        if (s.evmLockBlock === undefined) s.evmLockBlock = Math.max(0, (await this.evm.blockNumber()) - 100_000); // a record from before the cursor was kept
         const sec = await this.evm.claimedSecret(s.evmLockId, s.evmLockBlock);
         if (sec) { s.secret = sec; s.secretVia = 'evm'; this.#ev(s, 'secret_seen_on_base'); this.store.save(s); }
       }

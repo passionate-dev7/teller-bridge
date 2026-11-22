@@ -108,6 +108,12 @@ export class EvmDesk {
     Object.assign(this, { publicClient, walletClient, account, deskLock, token });
     this.address = account.address;
   }
+  async blockNumber() { return Number(await this.publicClient.getBlockNumber()); }
+  /** the deployed DeskLock must exist and hold exactly the token this desk pays out */
+  async verifyDeployment() {
+    const held = await this.publicClient.readContract({ address: this.deskLock, abi: DESK_LOCK_ABI, functionName: 'token' });
+    if (held.toLowerCase() !== this.token.toLowerCase()) throw new Error('DeskLock ' + this.deskLock + ' holds token ' + held + ', the desk is configured for ' + this.token);
+  }
   async now() { return Number((await this.publicClient.getBlock({ blockTag: 'latest' })).timestamp); }
   usdcBalance() { return this.publicClient.readContract({ address: this.token, abi: ERC20_ABI, functionName: 'balanceOf', args: [this.address] }); }
   ethBalance() { return this.publicClient.getBalance({ address: this.address }); }

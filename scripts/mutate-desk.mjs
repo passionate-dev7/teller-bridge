@@ -9,7 +9,7 @@ const root = new URL('..', import.meta.url).pathname;
 const work = mkdtempSync(join(tmpdir(), 'desk-mut-'));
 for (const d of ['desk', 'lib', 'contracts', 'test', 'package.json']) cpSync(join(root, d), join(work, d), { recursive: true, filter: (p) => !p.includes('/contracts/evm/lib') && !p.includes('/contracts/evm/out') });
 symlinkSync(join(root, 'node_modules'), join(work, 'node_modules'));
-const FILES = { engine: join(work, 'desk/engine.js'), client: join(work, 'lib/client.js'), bch: join(work, 'lib/bch.js'), config: join(work, 'lib/config.js'), wizard: join(work, 'lib/wizard.js') };
+const FILES = { engine: join(work, 'desk/engine.js'), client: join(work, 'lib/client.js'), bch: join(work, 'lib/bch.js'), config: join(work, 'lib/config.js'), chains: join(work, 'desk/chains.js'), server: join(work, 'desk/server.js'), wizard: join(work, 'lib/wizard.js') };
 const originals = Object.fromEntries(Object.entries(FILES).map(([k, f]) => [k, readFileSync(f, 'utf8')]));
 
 const M = [
@@ -63,6 +63,14 @@ const M = [
   ['base2bch: swap booked done although the user USDC lock is gone', "return this.#move(s, 'loss', 'usdc_lock_gone');", "return this.#move(s, 'done', 'done');"],
   ['base2bch: refund_wait stops reading the BCH lock', "      if (s.txs.deskLock) {\n        if (!s.secret) {", "      if (false) {\n        if (!s.secret) {"],
   ['base2bch: a claim seen too late is not booked as a loss', "s.note = 'the BCH lock was claimed but the Base lock had already run out';", "s.note = 'x'; userLock.state = 0;"],
+  ['forwarded-for believed from any peer', ".test(peer)) return peer;", ".test(peer) && false) return peer;", 'server'],
+  ['forwarded-for: the client-chosen entry is used', "list[list.length - hops]", "list[0]", 'server'],
+  ['rate limiter map grows without bound', "if (hits.size > maxKeys) for", "if (false) for", 'server'],
+  ['rate limiter never forgets a client', "now - t < windowMs", "true", 'server'],
+  ['Base log cursor is not kept before broadcasting', "        s.evmLockBlock = await this.evm.blockNumber();\n        this.store.save(s);\n", ""],
+  ['peg: a price more than 1 percent off par is quoted', "if (!(Math.abs(hit.usd - 1) <= 0.01))", "if (false)"],
+  ['peg: an unreadable price is quoted (fails open)', "catch { throw new DeskError('peg', 'the ' + symbol + ' price cannot be read right now, try again shortly'); }", "catch { hit = { at: now, usd: 1 }; }"],
+  ['startup: a DeskLock holding another token is accepted', "if (held.toLowerCase() !== this.token.toLowerCase()) throw", "if (false) throw", 'chains'],
   ['client accepts a different hashlock', "if (q.hashlock !== req.hashlock) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a different send amount', "if (q.sendUnits !== String(req.sendUnits)) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a refund or recipient script that is not the wallet', "if (q.userBchLock !== req.userBchLock) bad.push", 'if (false) bad.push', 'client'],

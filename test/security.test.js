@@ -226,3 +226,77 @@ test('5 inventory is reserved when a lock is seen on chain, not when a quote is 
   assert.equal(r.swap(qa.id).state, 'user_locked');
   assert.equal(BigInt((await r.desk.status()).pairs[0].available.usdcUnits), 10_000_000n - BigInt(qa.recvUnits), 'the seen lock reserves its payout');
 });
+
+// ---------------------------------------------------------------- 6. client addresses, the Base log cursor, the peg, and the deployed token
+
+test('6 a forwarded-for header is believed only from a loopback proxy and only at the configured hop count', async () => {
+  const { clientIp } = await import('../desk/server.js');
+  const req = (peer, xff) => ({ socket: { remoteAddress: peer }, headers: xff === undefined ? {} : { 'x-forwarded-for': xff } });
+  assert.equal(clientIp(req('5.6.7.8', 'evil'), undefined), '5.6.7.8', 'no proxy configured');
+  assert.equal(clientIp(req('5.6.7.8', 'evil'), '1'), '5.6.7.8', 'peer is not the proxy');
+  assert.equal(clientIp(req('127.0.0.1', '9.9.9.9'), '1'), '9.9.9.9', 'one proxy hop');
+  assert.equal(clientIp(req('127.0.0.1', 'evil, 9.9.9.9'), '1'), '9.9.9.9', 'the proxy appends, the client prefix is ignored');
+  assert.equal(clientIp(req('127.0.0.1', 'evil, 9.9.9.9, 10.0.0.1'), '2'), '9.9.9.9', 'two proxy hops');
+  assert.equal(clientIp(req('127.0.0.1', '9.9.9.9'), 'yes'), '127.0.0.1', 'TRUST_PROXY must be a hop count');
+  assert.equal(clientIp(req('127.0.0.1', undefined), '1'), '127.0.0.1', 'no header');
+});
+
+test('6 the rate limiter forgets old clients and cannot grow without bound', async () => {
+  const { rateLimiter } = await import('../desk/server.js');
+  const limited = rateLimiter({ limit: 3, windowMs: 60_000, maxKeys: 1000 });
+  const t = 1_000_000;
+  assert.deepEqual([1, 2, 3, 4].map(() => limited('a', t)), [false, false, false, true]);
+  for (let i = 0; i < 20_000; i++) limited('ip' + i, t + i);
+  assert.ok(limited.size() <= 1000, 'map holds ' + limited.size());
+  assert.equal(limited('a', t + 61_000 + 20_000), false, 'window passed');
+});
+
+test('6 a Base RPC error during the desk lock does not lose the log cursor', async () => {
+  const r = await fresh();
+  r.user.fundBch(10_000n);
+  const { secret, hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'bch2base', sendUnits: '100', hashlock });
+  await r.user.lockBch(q);
+  await r.warp(5);
+  // the lock lands on Base, then the desk's call fails (receipt timeout, restart)
+  const orig = r.evm.lock.bind(r.evm);
+  r.evm.lock = async (a) => { await orig(a); throw new Error('rpc blip'); };
+  await r.tick();
+  r.evm.lock = orig;
+  await r.warp(5);
+  const mid = r.swap(q.id);
+  assert.ok(mid.evmLockId, 'lock id was recorded');
+  // the public RPC refuses a log scan from genesis
+  const getLogs = r.evm.publicClient.getLogs.bind(r.evm.publicClient);
+  r.evm.publicClient.getLogs = async (p) => { if (!p.fromBlock || p.fromBlock === 0n) throw new Error('query returned more than 10000 results'); return getLogs(p); };
+  await r.user.claimUsdcSelf({ evmLockId: mid.evmLockId }, secret);
+  await r.tick(2);
+  assert.equal(r.swap(q.id).state, 'done');
+});
+
+test('6 quotes are refused when the PUSD price is more than one percent off par, and when the price cannot be read', async () => {
+  const r = await fresh();
+  const mk = () => ({ dir: 'bch2base', pair: 'PUSD', sendUnits: '100', hashlock: r.user.secret().hashlock, userBchAddress: r.user.bch.chipnet, userEvm: r.user.evm.account.address });
+  r.desk.peg = async () => 0.95;
+  await assert.rejects(r.desk.createSwap(mk()), (e) => e.code === 'peg');
+  await r.warp(61); // the price is cached for a minute
+  r.desk.peg = async () => 1.02;
+  await assert.rejects(r.desk.createSwap(mk()), (e) => e.code === 'peg');
+  await r.warp(61);
+  r.desk.peg = async () => { throw new Error('router down'); };
+  await assert.rejects(r.desk.createSwap(mk()), (e) => e.code === 'peg');
+  await r.warp(61);
+  r.desk.peg = async () => 1.004;
+  assert.equal((await r.desk.createSwap({ ...mk(), dir: 'base2bch', sendUnits: '500000' })).state, 'quoted');
+  assert.equal((await r.desk.createSwap(mk())).state, 'quoted');
+});
+
+test('6 the desk refuses to start against a DeskLock that holds a different token', async () => {
+  const r = await fresh();
+  await r.evm.verifyDeployment(); // the rig deployed DeskLock with the token the desk uses
+  const { EvmDesk } = await import('../desk/chains.js');
+  const wrong = new EvmDesk({ publicClient: r.publicClient, walletClient: r.evm.walletClient, account: r.evm.account, deskLock: r.deskLock, token: '0x000000000000000000000000000000000000dEaD' });
+  await assert.rejects(wrong.verifyDeployment(), /token/);
+  const nowhere = new EvmDesk({ publicClient: r.publicClient, walletClient: r.evm.walletClient, account: r.evm.account, deskLock: '0x000000000000000000000000000000000000dEaD', token: r.token });
+  await assert.rejects(nowhere.verifyDeployment());
+});
