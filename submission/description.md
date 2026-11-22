@@ -1,6 +1,6 @@
 # Teller
 
-**One secret opens two locks: PUSD and USDC swap atomically, any size.**
+**One secret opens two locks: PUSD and USDC swap atomically.**
 
 Teller swaps ParyonUSD (PUSD) or MUSD on Bitcoin Cash for USDC on Base, and back, against a desk that holds inventory on both chains. The user's coins sit in a hash-timelock on one chain, the desk's coins sit in a hash-timelock on the other, and one 32-byte secret opens both; a size above the desk's inventory is quoted live through NEAR Intents and Cauldron, so no amount fails.
 
