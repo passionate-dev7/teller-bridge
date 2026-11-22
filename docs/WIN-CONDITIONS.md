@@ -2,7 +2,7 @@
 
 ## What this entry is
 
-An atomic hash-timelock desk between ParyonUSD (PUSD) and MUSD on Bitcoin Cash and USDC on Base, both directions. The desk is the counterparty with owned inventory, the live capacity is printed on the swap card, and anything above it routes to NEAR Intents 1Click so no size fails.
+An atomic hash-timelock desk between ParyonUSD (PUSD) and MUSD on Bitcoin Cash and USDC on Base, both directions. The desk is the counterparty with owned inventory, the live capacity is printed on the swap card, and anything above it routes to NEAR Intents 1Click.
 
 Host assets: PUSD category `2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544` and MUSD category `b38a33f750f84c5c169a6f23cb873e6e79605021585d4f3408789689ed87f366` on Bitcoin Cash, USDC on Base (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`).
 
