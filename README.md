@@ -8,7 +8,7 @@ The swap card shows what the desk can fill right now, per direction, read from t
 
 1. The card opens with two drawers, the PUSD drawer on Bitcoin Cash and the USDC drawer on Base, each showing the live balance, what open quotes have reserved, and "fills up to" under the amount box.
 2. 0.50 PUSD to USDC takes one WizardConnect signature and a pasted (or generated) Base address. No Base wallet, no Base gas. The receipt strip prints every leg with elapsed seconds and an explorer link.
-3. The other way, USDC on Base to PUSD on Bitcoin Cash, needs a Base wallet (injected or WalletConnect) and no BCH signature at all: the desk relays the claim that pays the user.
+3. The other way, USDC on Base to PUSD on Bitcoin Cash, needs a Base wallet (injected or WalletConnect) and no BCH signature at all: the desk relays the claim that pays the user. The browser reads the desk's Bitcoin Cash lock itself and releases its secret only once that lock has a confirmation, so this direction takes one block.
 4. Amounts above the desk's inventory show a live NEAR Intents and Cauldron route quote instead of an error.
 5. Past swaps replay from the desk's own record, each leg linked to its explorer.
 
@@ -28,7 +28,8 @@ If anything stalls, both sides time out in the order that keeps the user whole: 
 | Refund only after the timeout, pays exactly the refund address, same one-in one-out shape | same | same |
 | Claim pays the recipient whoever sends it, refund pays the sender and only from the timeout | `contracts/evm/src/DeskLock.sol` | `contracts/evm/test/DeskLock.t.sol`, 18 mutants killed |
 | The desk answers only with margin before the user's refund time, never double-locks, refunds and relays refunds | `desk/engine.js` | `test/desk.test.js`, every refund and timeout branch of both directions |
-| The browser refuses a quote whose terms differ from what it asked for | `lib/client.js` | `test/client.test.js` |
+| The browser refuses a quote whose terms differ from what it asked for, a status that names a contract other than the pinned one, and releases its secret only after reading the desk's lock on chain | `lib/client.js` | `test/client.test.js`, `test/security.test.js` |
+| A vanished user lock is a recorded loss, never a completed swap; quotes reserve nothing; the desk quotes only near par | `desk/engine.js` | `test/security.test.js` |
 
 `TESTS.md` lists every suite, every mutant and the chipnet transactions of the recorded swaps with their confirmations.
 
