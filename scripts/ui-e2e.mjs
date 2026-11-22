@@ -51,6 +51,8 @@ await until('wallet funded', async () => { const u = await chain.getUtxos(receiv
 
 // 2. open the app in its own tab
 bh('open', UI);
+await sleep(2500);
+bh('eval', "localStorage.clear(); location.reload()");
 await sleep(3000);
 const tabs = JSON.parse(bh('tabs')).tabs;
 const mine = tabs.find((t) => t.url.startsWith(UI.replace(/\/$/, '')));
@@ -83,6 +85,8 @@ try {
   result.payee = payee;
   result.payeeUsdc = String(await pc.readContract({ address: status.evm.token, abi: ERC20_ABI, functionName: 'balanceOf', args: [payee] }));
   result.ok = result.payeeUsdc === '498500' && wallet.signed === 1;
+} catch (e) {
+  result.error = e.message;
 } finally {
   wallet.stop();
   try { bh('close', mine.targetId); } catch { /* tab already gone */ }

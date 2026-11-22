@@ -21,15 +21,15 @@ export function useBchWallet(status) {
 }
 
 /** Base side: any injected wallet, or WalletConnect when a project id is configured. */
-export function useEvmWallet() {
-  const { address, chainId, isConnected } = useAccount();
+export function useEvmWallet(chainId) {
+  const { address, chainId: walletChain, isConnected } = useAccount();
   const { connectors, connectAsync } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient({ chainId });
   return {
-    address, chainId, isConnected, connectors,
+    address, chainId: walletChain, isConnected, connectors,
     connect: (c) => connectAsync({ connector: c }),
     disconnect,
     switchChain: (id) => switchChainAsync({ chainId: id }),

@@ -33,7 +33,7 @@ export default function App() {
   const api = useMemo(() => deskApi(DESK_URL), []);
   const { status, offline } = useStatus(api);
   const bch = useBchWallet(status);
-  const evm = useEvmWallet();
+  const evm = useEvmWallet(status?.evm.chainId);
 
   const params = useMemo(() => new URLSearchParams(location.search), []);
   const [dir, setDir] = useState(params.get('dir') === 'base2bch' ? 'base2bch' : 'bch2base');
@@ -239,7 +239,7 @@ export default function App() {
                   <div style={{ marginTop: 8 }}><button className="btn small" onClick={claimSelf}>{track.dir === 'bch2base' ? 'Claim on Base with my wallet' : 'Claim on Bitcoin Cash now'}</button> {claimMsg && <span className="sub">{claimMsg}</span>}</div>
                 </div>
               )}
-              {TERMINAL.includes(swap.state) && <button className="btn" onClick={finish}>New swap</button>}
+              {(TERMINAL.includes(swap.state) || swap.state === 'quoted') && <button className="btn" onClick={() => { if (swap.state === 'quoted') forget(swap.hashlock); finish(); }}>{swap.state === 'quoted' ? 'Cancel this quote' : 'New swap'}</button>}
               {!TERMINAL.includes(swap.state) && <span className="sub">Keep this tab open. Your secret lives in it; a refund path exists either way.</span>}
             </div>
           )}

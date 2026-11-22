@@ -14,6 +14,8 @@ export const keep = (rec) => { const all = saved().filter((r) => r.hashlock !== 
 export const forget = (hashlock) => localStorage.setItem(KEY, JSON.stringify(saved().filter((r) => r.hashlock !== hashlock)));
 
 const now = () => Math.floor(Date.now() / 1000);
+/** Run one named step; a failure says which step, so the person (and a support message) can tell where it stopped. */
+const step = async (name, fn) => { try { return await fn(); } catch (e) { throw Object.assign(new Error(name + ': ' + (e.shortMessage ?? e.message)), { cause: e }); } };
 
 /** PUSD (or MUSD) on Bitcoin Cash -> USDC on Base. One wallet signature on the BCH lock; the desk does the rest. */
 export async function startBchToBase({ api, status, pair, cents, baseAddress, wallet }) {
@@ -46,15 +48,15 @@ export async function startBaseToBch({ api, status, pair, cents, bchAddress, evm
   const problems = checkQuote(quote, { ...req, userBchLock: lockingBytecodeOf(bchAddress) }, status, now(), provider);
   if (problems.length) throw new Error('Quote refused by your browser: ' + problems.join('; '));
   keep({ hashlock, secret, dir: 'base2bch', pair, cents: cents.toString(), id: quote.id });
-  if (evm.chainId !== status.evm.chainId) await evm.switchChain(status.evm.chainId);
-  const allowance = await evm.publicClient.readContract({ address: status.evm.token, abi: ERC20_ABI, functionName: 'allowance', args: [evm.address, status.evm.deskLock] });
+  if (evm.chainId !== status.evm.chainId) await step('switch network', () => evm.switchChain(status.evm.chainId));
+  const allowance = await step('read allowance', () => evm.publicClient.readContract({ address: status.evm.token, abi: ERC20_ABI, functionName: 'allowance', args: [evm.address, status.evm.deskLock] }));
   if (allowance < units) {
-    const h = await evm.write({ address: status.evm.token, abi: ERC20_ABI, functionName: 'approve', args: [status.evm.deskLock, units] });
-    await evm.publicClient.waitForTransactionReceipt({ hash: h });
+    const h = await step('approve USDC', () => evm.write({ address: status.evm.token, abi: ERC20_ABI, functionName: 'approve', args: [status.evm.deskLock, units] }));
+    await step('wait for approval', () => evm.publicClient.waitForTransactionReceipt({ hash: h }));
   }
-  const lockHash = await evm.write({ address: status.evm.deskLock, abi: DESK_LOCK_ABI, functionName: 'lock', args: [status.evm.deskAddress, '0x' + hashlock, BigInt(quote.evmTimeout), units] });
+  const lockHash = await step('lock USDC', () => evm.write({ address: status.evm.deskLock, abi: DESK_LOCK_ABI, functionName: 'lock', args: [status.evm.deskAddress, '0x' + hashlock, BigInt(quote.evmTimeout), units] }));
   keep({ hashlock, secret, dir: 'base2bch', pair, cents: cents.toString(), id: quote.id, userLockTx: lockHash });
-  await evm.publicClient.waitForTransactionReceipt({ hash: lockHash });
+  await step('wait for lock', () => evm.publicClient.waitForTransactionReceipt({ hash: lockHash }));
   return { quote, secret, userLockTx: lockHash };
 }
 
