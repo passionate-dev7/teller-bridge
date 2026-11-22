@@ -19,6 +19,7 @@ const M = [
   ['bch2base: user BCH refund never relayed', "if ((await this.bch.mtp()) >= s.bchRefundTime) {", 'if (false) {'],
   ['bch2base: lock after quote expiry is answered anyway', "if (s.state === 'expired' || now > s.quoteExpiry) { s.note = 'funded after the quote expired; refund is released at '", "if (false) { s.note = 'funded after the quote expired; refund is released at '"],
   ['bch2base: no safety margin before the BCH refund time', "if (s.bchRefundTime - evmNow < this.rules.overlap + MIN_LEFT)", 'if (false)'],
+  ['bch2base: large mempool locks are answered before a confirmation', "if (BigInt(s.sendUnits) > this.rules.zeroConfMaxCents && (await this.bch.confirmations(s.txs.userLock)) < 1) return;", ''],
   ['bch2base: desk locks USDC it does not hold', "if (usdc < BigInt(s.recvUnits)) {", 'if (false) {'],
   ['bch2base: the user is never paid on reveal', "evmNow < s.evmTimeout && s.secretVia === 'reveal')", "evmNow < s.evmTimeout && false)"],
   ['base2bch: no safety margin before the Base timeout', "if (s.evmTimeout - evmNow < this.rules.evmOverlap + MIN_LEFT)", 'if (false)'],

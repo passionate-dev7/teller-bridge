@@ -80,6 +80,28 @@ test('bch2base: user vanishes, desk takes its USDC back at the Base timeout, the
   assert.equal(await r.deskTokens(), 100_000n, 'desk never touched the user lock');
 });
 
+test('bch2base: above the 0-conf limit the desk waits for one confirmation before locking USDC', async () => {
+  const r = await fresh({ rules: { zeroConfMaxCents: 100n } });
+  r.user.fundBch(10_000n);
+  const { hashlock } = r.user.secret();
+  const deskUsdc0 = await r.evm.usdcBalance();
+  const q = await r.user.request({ dir: 'bch2base', sendUnits: '300', hashlock }); // 3.00 > 1.00 limit
+  const lockTx = await r.user.lockBch(q);
+  await r.tick();
+  assert.equal(r.swap(q.id).state, 'user_locked', 'unconfirmed lock is not answered');
+  assert.equal(await r.evm.usdcBalance(), deskUsdc0);
+  r.chain.confirmed.add(lockTx);
+  await r.tick();
+  assert.equal(r.swap(q.id).state, 'desk_locked');
+  assert.ok((await r.evm.usdcBalance()) < deskUsdc0);
+  // under the limit a mempool lock is answered at once
+  const small = r.user.secret();
+  const q2 = await r.user.request({ dir: 'bch2base', sendUnits: '100', hashlock: small.hashlock });
+  await r.user.lockBch(q2);
+  await r.tick();
+  assert.equal(r.swap(q2.id).state, 'desk_locked');
+});
+
 test('bch2base: a quote nobody funds expires and reserves nothing afterwards', async () => {
   const r = await fresh();
   const { hashlock } = r.user.secret();

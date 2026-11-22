@@ -74,6 +74,7 @@ export class Desk {
       reasons: cap.reasons,
       feeBps: Number(this.rules.feeBps),
       minUsdCents: Number(this.rules.minUsdCents),
+      zeroConfMaxCents: Number(this.rules.zeroConfMaxCents),
       quoteTtl: this.rules.quoteTtl,
       bch: { ...this.cfg.bch, deskAddress: this.bch.tokenAddress(), deskLock: this.bch.lockingHex },
       evm: { chainId: this.cfg.evm.chainId, name: this.cfg.evm.name, explorerTx: this.cfg.evm.explorerTx, explorerAddr: this.cfg.evm.explorerAddr, deskLock: this.evm.deskLock, token: this.evm.token, deskAddress: this.evm.address },
@@ -216,6 +217,8 @@ export class Desk {
     }
 
     if (s.state === 'user_locked') {
+      // a BCH lock still in the mempool can be double-spent after the desk has paid: above the 0-conf limit wait for a block
+      if (BigInt(s.sendUnits) > this.rules.zeroConfMaxCents && (await this.bch.confirmations(s.txs.userLock)) < 1) return;
       if (s.bchRefundTime - evmNow < this.rules.overlap + MIN_LEFT) { s.note = 'too close to the BCH refund time to answer safely'; return this.#move(s, 'refund_wait', 'too_late'); }
       if (!s.evmTimeout) {
         s.evmTimeout = Math.min(evmNow + this.rules.deskEvmWindow, s.bchRefundTime - this.rules.overlap);

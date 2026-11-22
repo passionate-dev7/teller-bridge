@@ -219,6 +219,7 @@ export default function App() {
                     <dl>
                       <dt>You lock</dt><dd>{money(cents, 2)} {sendSym}</dd>
                       <dt>You get</dt><dd>{money(recv, dir === 'bch2base' ? 6 : 2, 2)} {recvSym}</dd>
+                      {dir === 'bch2base' && <><dt>Desk answers</dt><dd>{cents > BigInt(status.zeroConfMaxCents) ? 'after one block, about 10 min' : 'within seconds'}</dd></>}
                       <dt>If the desk never answers</dt><dd>refund after {hours(dir === 'bch2base' ? status.windows.userBchWindow : status.windows.userEvmWindow)}</dd>
                     </dl>
                   </div>

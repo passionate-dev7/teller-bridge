@@ -16,6 +16,10 @@ export class ElectrumChain extends ElectrumNetworkProvider {
     return rows.map((r) => r.tx_hash);
   }
   medianTime() { return medianTimePast(this); }
+  async confirmations(txid) {
+    const t = await this.performRequest('blockchain.transaction.get', txid, true);
+    return t.confirmations ?? 0;
+  }
 }
 
 /** In-memory chain that validates every spend against the BCH VM (tests). Mirrors ElectrumChain's extra reads. */
@@ -36,6 +40,9 @@ export class MemoryChain extends MockNetworkProvider {
     return [...mine];
   }
   async medianTime() { return this.mtp; }
+  confirmed = new Set();
+  /** tests decide when a tx counts as confirmed */
+  async confirmations(txid) { return this.confirmed.has(txid) ? 1 : 0; }
 }
 
 export class BchDesk {
@@ -58,6 +65,7 @@ export class BchDesk {
   async tokenBalance(category) { return (await this.utxos()).reduce((a, u) => (u.token && u.token.category === category && !u.token.nft ? a + u.token.amount : a), 0n); }
   async plainSats() { return (await this.utxos()).reduce((a, u) => (u.token ? a : a + u.satoshis), 0n); }
   mtp() { return this.provider.medianTime(); }
+  confirmations(txid) { return this.provider.confirmations(txid); }
 
   /** Funded swap UTXOs at the lock address of swap `s` (carrying at least the amount the swap is about). */
   async funded(s) {
