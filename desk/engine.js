@@ -342,6 +342,23 @@ export class Desk {
     }
 
     if (s.state === 'refund_wait') {
+      // the BCH lock may have been claimed after all (the desk's refund can lose the first-seen race): keep reading it
+      if (s.txs.deskLock) {
+        if (!s.secret) {
+          const sec = await this.bch.findSecret(s);
+          if (sec) { s.secret = sec; s.secretVia = 'bch'; this.#ev(s, 'secret_seen_on_bch'); this.store.save(s); }
+        }
+        if (s.secret && userLock.state === LOCK_STATE.Open) {
+          if (evmNow < s.evmTimeout) {
+            const r = await this.evm.claim(s.evmLockId, s.secret);
+            s.txs.deskClaim = r.hash;
+            return this.#move(s, 'done', 'desk_claimed_usdc', { txid: r.hash, chain: 'evm' });
+          }
+          s.note = 'the BCH lock was claimed but the Base lock had already run out';
+          this.log('LOSS', s.id, s.note);
+          return this.#move(s, 'loss', 'usdc_lock_gone');
+        }
+      }
       if (userLock.state === LOCK_STATE.Open && evmNow >= s.evmTimeout) {
         const r = await this.evm.refund(s.evmLockId);
         s.txs.userRefund = r.hash;

@@ -58,6 +58,8 @@ const M = [
   ['0-conf limit raised above what the desk can afford to lose', "zeroConfMaxCents: 100n,", 'zeroConfMaxCents: 2500n,', 'config'],
   ['bch2base: swap booked done although the user lock vanished', "if (await this.bch.findSecret(s)) return this.#move(s, 'done', 'done');", "return this.#move(s, 'done', 'done');"],
   ['base2bch: swap booked done although the user USDC lock is gone', "return this.#move(s, 'loss', 'usdc_lock_gone');", "return this.#move(s, 'done', 'done');"],
+  ['base2bch: refund_wait stops reading the BCH lock', "      if (s.txs.deskLock) {\n        if (!s.secret) {", "      if (false) {\n        if (!s.secret) {"],
+  ['base2bch: a claim seen too late is not booked as a loss', "s.note = 'the BCH lock was claimed but the Base lock had already run out';", "s.note = 'x'; userLock.state = 0;"],
   ['client accepts a different hashlock', "if (q.hashlock !== req.hashlock) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a different send amount', "if (q.sendUnits !== String(req.sendUnits)) bad.push", 'if (false) bad.push', 'client'],
   ['client accepts a refund or recipient script that is not the wallet', "if (q.userBchLock !== req.userBchLock) bad.push", 'if (false) bad.push', 'client'],

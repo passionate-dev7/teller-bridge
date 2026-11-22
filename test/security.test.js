@@ -140,3 +140,51 @@ test('3 base2bch: if the user USDC lock is gone when the desk goes to claim it, 
   await r.desk.reveal(q.id, secret);
   assert.equal(r.swap(q.id).state, 'loss');
 });
+
+// ---------------------------------------------------------------- 4. refund_wait keeps reading the BCH lock
+
+test('4 base2bch: the desk\'s BCH refund is lost in the first-seen race and the user claims instead: the desk claims the USDC, and never relays the user a refund', async () => {
+  const r = await fresh();
+  await r.user.fundUsdc(5_000_000n);
+  r.user.fundBch();
+  const { secret, hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'base2bch', sendUnits: '1000000', hashlock });
+  await r.user.lockUsdc(q);
+  await r.tick();
+  const locked = r.swap(q.id);
+  assert.equal(locked.state, 'desk_locked');
+  const deskUsdc0 = await r.evm.usdcBalance();
+  // the refund the desk believes it sent never reaches a miner
+  r.bch.refund = async () => 'ab'.repeat(32);
+  await r.warp(locked.bchRefundTime - r.chain.mtp + 5);
+  await r.tick();
+  assert.equal(r.swap(q.id).state, 'refund_wait');
+  // the user's claim is the one that gets mined
+  await r.user.claimBchSelf(locked, secret);
+  assert.equal(await r.user.bchTokens(), 99n);
+  await r.tick();
+  assert.equal(r.swap(q.id).state, 'done', 'the desk saw the claim and took the USDC');
+  assert.equal(await r.evm.usdcBalance(), deskUsdc0 + 1_000_000n);
+  await r.warp(q.evmTimeout - r.clock() + 5);
+  await r.tick();
+  assert.equal(await r.user.usdc(), 4_000_000n, 'the user did not also get the USDC back');
+});
+
+test('4 base2bch: a claim seen only after the Base lock expired is a loss and the desk does not refund the user on top', async () => {
+  const r = await fresh();
+  await r.user.fundUsdc(5_000_000n);
+  r.user.fundBch();
+  const { secret, hashlock } = r.user.secret();
+  const q = await r.user.request({ dir: 'base2bch', sendUnits: '1000000', hashlock });
+  await r.user.lockUsdc(q);
+  await r.tick();
+  const locked = r.swap(q.id);
+  r.bch.refund = async () => 'ab'.repeat(32);
+  await r.warp(locked.bchRefundTime - r.chain.mtp + 5);
+  await r.tick();
+  await r.user.claimBchSelf(locked, secret);
+  await r.warp(q.evmTimeout - r.clock() + 5); // the desk was down until now
+  await r.tick();
+  assert.equal(r.swap(q.id).state, 'loss');
+  assert.equal(await r.user.usdc(), 4_000_000n, 'no refund relayed for a lock whose BCH side was claimed');
+});
