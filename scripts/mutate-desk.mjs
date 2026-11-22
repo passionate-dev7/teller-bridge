@@ -5,12 +5,30 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { spawn } from 'node:child_process';
+import { appendFileSync, existsSync } from 'node:fs';
+
 const root = new URL('..', import.meta.url).pathname;
-const work = mkdtempSync(join(tmpdir(), 'desk-mut-'));
-for (const d of ['desk', 'lib', 'contracts', 'test', 'package.json']) cpSync(join(root, d), join(work, d), { recursive: true, filter: (p) => !p.includes('/contracts/evm/lib') && !p.includes('/contracts/evm/out') });
-symlinkSync(join(root, 'node_modules'), join(work, 'node_modules'));
-const FILES = { engine: join(work, 'desk/engine.js'), client: join(work, 'lib/client.js'), bch: join(work, 'lib/bch.js'), config: join(work, 'lib/config.js'), chains: join(work, 'desk/chains.js'), server: join(work, 'desk/server.js'), wizard: join(work, 'lib/wizard.js') };
-const originals = Object.fromEntries(Object.entries(FILES).map(([k, f]) => [k, readFileSync(f, 'utf8')]));
+const WORKERS = Number(process.env.MUTATE_WORKERS ?? 4);
+const TESTS = ['test/desk.test.js', 'test/client.test.js', 'test/wizard.test.js', 'test/security.test.js'];
+const REL = { engine: 'desk/engine.js', client: 'lib/client.js', bch: 'lib/bch.js', wizard: 'lib/wizard.js', config: 'lib/config.js', chains: 'desk/chains.js', server: 'desk/server.js' };
+
+/** a throwaway copy of the repo: the working tree is never touched, and each worker mutates its own copy */
+function copy() {
+  const work = mkdtempSync(join(tmpdir(), 'desk-mut-'));
+  for (const d of ['desk', 'lib', 'contracts', 'test', 'package.json']) cpSync(join(root, d), join(work, d), { recursive: true, filter: (p) => !p.includes('/contracts/evm/lib') && !p.includes('/contracts/evm/out') });
+  symlinkSync(join(root, 'node_modules'), join(work, 'node_modules'));
+  const originals = Object.fromEntries(Object.entries(REL).map(([k, f]) => [k, readFileSync(join(work, f), 'utf8')]));
+  return { work, originals };
+}
+const run = (work) => new Promise((resolve) => {
+  let out = '';
+  const p = spawn('node', ['--test', ...TESTS], { cwd: work });
+  p.stdout.on('data', (d) => { out += d; });
+  // a mutant that makes the engine wait forever counts as caught, but only after the suite has had ten minutes
+  const timer = setTimeout(() => { out += '\nℹ fail 1 (timed out)\n'; p.kill('SIGKILL'); }, 600_000);
+  p.on('close', (code) => { clearTimeout(timer); resolve({ status: code ?? 1, stdout: out }); });
+});
 
 const M = [
   ['bch2base: desk never refunds its USDC at the Base timeout', "if (l.state === LOCK_STATE.Open && evmNow >= s.evmTimeout) {", 'if (false) {'],
@@ -47,7 +65,7 @@ const M = [
   ['reveal gate: lock may be made by anyone', "if (l.sender.toLowerCase() !== pin.deskEvm.toLowerCase()) return no('lock was not made by the desk account');", '', 'client'],
   ['reveal gate: lock may pay another recipient', "if (l.recipient.toLowerCase() !== swap.userEvm.toLowerCase()) return no('lock does not pay your address');", '', 'client'],
   ['reveal gate: lock may hold less than the quote', "if (BigInt(l.amount) !== recv) return no('lock holds a different amount');", '', 'client'],
-  ['reveal gate: lock may use another hashlock', "if (l.hashlock.toLowerCase() !== '0x' + swap.hashlock) return no('lock uses a different hashlock');", '', 'client'],
+  ['reveal gate: lock may use another hashlock', "if (l.hashlock.toLowerCase() !== '0x' + swap.hashlock) return no('lock uses a different hashlock');\n    if (lockId({ sender: l.sender, recipient: l.recipient, hashlock: swap.hashlock, timeout: l.timeout, amount: l.amount }) !== swap.evmLockId) return no('lock id does not match its terms');", '', 'client'],
   ['reveal gate: Base lock may outlive the BCH refund margin', "if (l.timeout > swap.bchRefundTime - status.windows.overlap) return no('lock outlives the margin before your BCH refund opens');", '', 'client'],
   ['reveal gate: Base lock may be about to expire', "if (l.timeout - now < REVEAL_MARGIN) return no('lock is too close to expiry to claim in time');", '', 'client'],
   ['reveal gate: BCH refund may open right before the Base refund', "if (swap.bchRefundTime > swap.evmTimeout - status.windows.evmOverlap) return no('BCH refund opens too close to your Base refund');", '', 'client'],
@@ -82,17 +100,34 @@ const M = [
   ['client accepts a Base lock id that does not follow from the terms', "if (id !== q.evmLockId) bad.push", 'if (false) bad.push', 'client'],
 ];
 
-const rows = [];
-const run = () => spawnSync('node', ['--test', 'test/desk.test.js', 'test/client.test.js', 'test/wizard.test.js', 'test/security.test.js'], { cwd: work, encoding: 'utf8' });
-const base = run();
-rows.push({ mutant: 'ORIGINAL', verdict: base.status === 0 ? 'green' : 'RED (unexpected)', failed: '' });
-for (const [name, from, to, which = 'engine'] of M) {
-  const original = originals[which];
-  if (!original.includes(from)) { rows.push({ mutant: name, verdict: 'ANCHOR MISSING', failed: '' }); continue; }
-  writeFileSync(FILES[which], original.replace(from, () => to));
-  const r = run();
-  writeFileSync(FILES[which], original);
-  rows.push({ mutant: name, verdict: r.status === 0 ? 'SURVIVED' : 'killed', failed: (r.stdout.match(/^ℹ fail (\d+)/m) ?? [])[1] });
+
+// MUTATE_LOG keeps each finished mutant on disk, so an interrupted run resumes where it stopped
+const LOG = process.env.MUTATE_LOG;
+const rows = new Array(M.length + 1);
+const done = new Set();
+if (LOG && existsSync(LOG)) for (const l of readFileSync(LOG, 'utf8').split('\n').filter(Boolean)) { const { i, row } = JSON.parse(l); if (M[i - 1]?.[0] === row.mutant || i === 0) { rows[i] = row; done.add(i); } }
+const record = (i, row) => { rows[i] = row; if (LOG) appendFileSync(LOG, JSON.stringify({ i, row }) + '\n'); };
+if (!done.has(0)) {
+  const base = copy();
+  const b = await run(base.work);
+  record(0, { mutant: 'ORIGINAL', verdict: b.status === 0 ? 'green' : 'RED (unexpected)', failed: '' });
 }
+let next = 0;
+const worker = async () => {
+  const { work, originals } = copy();
+  for (;;) {
+    const i = next++;
+    if (i >= M.length) return;
+    if (done.has(i + 1)) continue;
+    const [name, from, to, which = 'engine'] = M[i];
+    const original = originals[which];
+    if (!original.includes(from)) { record(i + 1, { mutant: name, verdict: 'ANCHOR MISSING', failed: '' }); continue; }
+    writeFileSync(join(work, REL[which]), original.replace(from, () => to));
+    const r = await run(work);
+    writeFileSync(join(work, REL[which]), original);
+    record(i + 1, { mutant: name, verdict: r.status === 0 ? 'SURVIVED' : 'killed', failed: (r.stdout.match(/^ℹ fail (\d+)/m) ?? [])[1] });
+  }
+};
+await Promise.all(Array.from({ length: WORKERS }, worker));
 console.table(rows);
 if (rows.some((r) => ['SURVIVED', 'ANCHOR MISSING'].includes(r.verdict) || r.verdict.startsWith('RED'))) process.exit(1);
