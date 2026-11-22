@@ -17,6 +17,7 @@ import testUsdc from '../contracts/evm/TestUSDC.json' with { type: 'json' };
 import { privateKeyToAccount } from 'viem/accounts';
 
 export async function setup(extraEnv = {}) {
+process.on('unhandledRejection', (e) => console.error('unhandled rejection:', e?.message ?? e));
 Object.assign(process.env, extraEnv);
 const env = { ...process.env };
 const net = NETWORKS[env.NETWORK ?? 'testnet'];

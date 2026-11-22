@@ -7,6 +7,7 @@ import { Network } from 'cashscript';
 import { Store } from '../desk/store.js';
 import { ElectrumChain } from '../desk/chains.js';
 
+process.on('unhandledRejection', (e) => console.error('electrum hiccup:', e?.message ?? e));
 const root = new URL('..', import.meta.url).pathname;
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8', env: { ...process.env, FOUNDRY_DISABLE_NIGHTLY_WARNING: '1' }, ...opts });
 const stamp = new Date().toISOString();

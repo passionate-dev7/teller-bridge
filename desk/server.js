@@ -75,6 +75,8 @@ export function createServer(desk, { oneClick = oneClickQuote, peg = pegQuote } 
 }
 
 if (import.meta.url === 'file://' + process.argv[1]) {
+  // a public Electrum server dropping a socket rejects inside the client library: log it, keep the desk running
+  process.on('unhandledRejection', (e) => console.error('[desk] unhandled rejection:', e?.message ?? e));
   const { desk } = buildDesk();
   const approval = await desk.evm.ensureAllowance();
   if (approval) console.error('[desk] approved DeskLock for USDC', approval.hash);

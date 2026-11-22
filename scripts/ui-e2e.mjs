@@ -1,7 +1,7 @@
 // Drives the real web app in the deepsurge browser profile against the dev rig (real chipnet + local anvil), with a
 // headless WizardConnect wallet doing the signing. Proves the judge path: pair, quote, one signature, USDC arrives.
 // usage: node --env-file=.env scripts/ui-e2e.mjs   (needs scripts/dev-rig.mjs on :8790 and `vite web --port 5199`)
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { Network, TransactionBuilder, SignatureTemplate } from 'cashscript';
 import { hexToBin } from '@bitauth/libauth';
@@ -36,8 +36,7 @@ const wallet = new HeadlessWallet(randomBytes(32));
 const receive = wallet.address('receive', 0, 'bchtest', true);
 log('wallet receive address', receive);
 
-// 1. fund the wallet: faucet sats and test PUSD from the desk
-spawnSync('node', ['scripts/chipnet-faucet.mjs', receive, '200000'], { encoding: 'utf8' });
+// 1. fund the wallet from the desk's confirmed coins: 10.00 test PUSD and 20000 sats of plain BCH for fees
 {
   const deskKey = process.env.DESK_BCH_KEY;
   const desk = addressesOf(deskKey);
@@ -48,9 +47,10 @@ spawnSync('node', ['scripts/chipnet-faucet.mjs', receive, '200000'], { encoding:
   const b = new TransactionBuilder({ provider: chain })
     .addInputs([tok, fee], t.unlockP2PKH())
     .addOutput({ to: receive, amount: 1000n, token: { category, amount: 1000n } })
+    .addOutput({ to: receive, amount: 20000n })
     .addTokenChangeOutputIfNeeded({ category, to: desk.chipnetTokens })
     .addBchChangeOutputIfNeeded({ to: desk.chipnetTokens, feeRate: 1.2 });
-  log('desk sent 10.00 test PUSD to the wallet', (await b.send()).txid);
+  log('desk sent 10.00 test PUSD and 20000 sats to the wallet', (await b.send()).txid);
 }
 await until('wallet funded', async () => { const u = await chain.getUtxos(receive); return u.some((x) => x.token) && u.some((x) => !x.token) ; }, 90);
 
