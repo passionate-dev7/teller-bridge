@@ -9,7 +9,8 @@ import { RATIO } from '../lib/config.js';
 
 export const ACTIVE = ['quoted', 'user_locked', 'desk_locked', 'refund_wait'];
 const WATCH = [...ACTIVE, 'expired'];
-const RESERVING = ['quoted', 'user_locked'];
+// inventory is held for a swap only once its lock is seen on chain: a quote costs the asker nothing, so it reserves nothing
+const RESERVING = ['user_locked'];
 /** margin before a lock's timeout below which the desk will not start the second leg (seconds) */
 const MIN_LEFT = 15 * 60;
 
@@ -37,8 +38,7 @@ export class Desk {
   // ---------- inventory and capacity ----------
 
   async capacity() {
-    const now = this.clock();
-    const live = this.store.inStates(RESERVING).filter((s) => s.state === 'user_locked' || s.quoteExpiry > now);
+    const live = this.store.inStates(RESERVING);
     const usdcReserved = live.filter((s) => s.dir === 'bch2base').reduce((a, s) => a + BigInt(s.recvUnits), 0n);
     const [usdc, eth, sats] = await Promise.all([this.evm.usdcBalance(), this.evm.ethBalance(), this.bch.plainSats()]);
     const reasons = [];
@@ -112,7 +112,7 @@ export class Desk {
 
     const active = this.store.inStates(ACTIVE);
     if (active.length >= this.rules.maxActive) throw new DeskError('busy', 'desk has too many open swaps, try again shortly');
-    if (active.filter((s) => s.ip === ip && s.state === 'quoted').length >= this.rules.maxActivePerIp) throw new DeskError('busy', 'too many open quotes from your address');
+    if (active.filter((s) => s.ip === ip).length >= this.rules.maxActivePerIp) throw new DeskError('busy', 'too many open quotes from your address');
 
     const cap = await this.capacity();
     const pc = cap.pairs.find((p) => p.symbol === pair.symbol);

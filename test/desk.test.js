@@ -107,11 +107,11 @@ test('bch2base: a quote nobody funds expires and reserves nothing afterwards', a
   const { hashlock } = r.user.secret();
   const before = (await r.desk.status()).pairs[0].available.usdcUnits;
   const q = await r.user.request({ dir: 'bch2base', sendUnits: '1000', hashlock });
-  assert.notEqual((await r.desk.status()).pairs[0].available.usdcUnits, before, 'quote reserves inventory');
+  assert.equal((await r.desk.status()).pairs[0].available.usdcUnits, before, 'a quote reserves nothing');
   await r.warp(r.rules.quoteTtl + 1);
   await r.tick();
   assert.equal(r.swap(q.id).state, 'expired');
-  assert.equal((await r.desk.status()).pairs[0].available.usdcUnits, before, 'reservation released');
+  assert.equal((await r.desk.status()).pairs[0].available.usdcUnits, before);
 });
 
 test('bch2base: a lock that lands after the quote expired is never answered on Base, and the user is refunded', async () => {
@@ -304,7 +304,7 @@ test('quotes: over capacity is refused with the live maximum and an overflow fla
   const ok = await r.user.request({ dir: 'bch2base', sendUnits: max.toString(), hashlock });
   assert.equal(ok.state, 'quoted');
   const again = r.user.secret();
-  await assert.rejects(r.user.request({ dir: 'bch2base', sendUnits: '100', hashlock: again.hashlock }), (e) => e.code === 'over_capacity', 'inventory is fully reserved by the first quote');
+  await r.user.request({ dir: 'bch2base', sendUnits: '100', hashlock: again.hashlock }); // a quote reserves nothing, see security.test.js
 });
 
 test('quotes: below minimum, bad address, reused hashlock, fractional cents are refused', async () => {

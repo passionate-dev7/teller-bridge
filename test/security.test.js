@@ -188,3 +188,41 @@ test('4 base2bch: a claim seen only after the Base lock expired is a loss and th
   assert.equal(r.swap(q.id).state, 'loss');
   assert.equal(await r.user.usdc(), 4_000_000n, 'no refund relayed for a lock whose BCH side was claimed');
 });
+
+// ---------------------------------------------------------------- 5. a quote is free, so it reserves nothing
+
+test('5 one client quoting the whole inventory does not lock everyone else out', async () => {
+  const r = await fresh();
+  const max = BigInt((await r.desk.status()).pairs[0].maxSend.bch2base);
+  const a = r.user.secret(), b = r.user.secret();
+  const first = await r.desk.createSwap({ dir: 'bch2base', pair: 'PUSD', sendUnits: max.toString(), hashlock: a.hashlock, userBchAddress: r.user.bch.chipnet, userEvm: r.user.evm.account.address }, '1.1.1.1');
+  assert.equal(first.state, 'quoted');
+  assert.equal(BigInt((await r.desk.status()).pairs[0].maxSend.bch2base), max, 'a quote reserves nothing');
+  const second = await r.desk.createSwap({ dir: 'bch2base', pair: 'PUSD', sendUnits: '100', hashlock: b.hashlock, userBchAddress: r.user.bch.chipnet, userEvm: r.user.evm.account.address }, '2.2.2.2');
+  assert.equal(second.state, 'quoted', 'a second client still gets a quote');
+});
+
+test('5 quotes live one minute, and one client address holds at most three open swaps', async () => {
+  const { DEFAULT_RULES } = await import('../lib/config.js');
+  assert.ok(DEFAULT_RULES.quoteTtl <= 60, 'ttl ' + DEFAULT_RULES.quoteTtl);
+  const r = await fresh();
+  const mk = () => ({ dir: 'bch2base', pair: 'PUSD', sendUnits: '100', hashlock: r.user.secret().hashlock, userBchAddress: r.user.bch.chipnet, userEvm: r.user.evm.account.address });
+  for (let i = 0; i < 3; i++) await r.desk.createSwap(mk(), '9.9.9.9');
+  await assert.rejects(r.desk.createSwap(mk(), '9.9.9.9'), (e) => e.code === 'busy');
+  await r.desk.createSwap(mk(), '8.8.8.8'); // another address is unaffected
+});
+
+test('5 inventory is reserved when a lock is seen on chain, not when a quote is asked for', async () => {
+  const r = await fresh({ rules: { zeroConfMaxCents: 100n } });
+  r.user.fundBch(10_000n);
+  const max = BigInt((await r.desk.status()).pairs[0].maxSend.bch2base);
+  const a = r.user.secret(), b = r.user.secret();
+  const qa = await r.user.request({ dir: 'bch2base', sendUnits: (max - 100n).toString(), hashlock: a.hashlock });
+  await r.user.request({ dir: 'bch2base', sendUnits: '300', hashlock: b.hashlock });
+  assert.equal((await r.desk.status()).pairs[0].available.usdcUnits, '10000000', 'two open quotes reserve nothing');
+  // the first lock is above the 0-conf limit and unconfirmed: the desk sees it and holds its payout back
+  await r.user.lockBch(qa);
+  await r.tick();
+  assert.equal(r.swap(qa.id).state, 'user_locked');
+  assert.equal(BigInt((await r.desk.status()).pairs[0].available.usdcUnits), 10_000_000n - BigInt(qa.recvUnits), 'the seen lock reserves its payout');
+});
