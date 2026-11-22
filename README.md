@@ -4,6 +4,16 @@ Atomic swaps between ParyonUSD (PUSD) and MUSD on Bitcoin Cash and USDC on Base,
 
 The swap card shows what the desk can fill right now, per direction, read from the desk wallets. A swap up to that number is atomic: the user's coins sit in a hash-timelock on one chain, the desk's coins sit in a hash-timelock on the other, and one 32-byte secret opens both. Anything above it is quoted live through NEAR Intents 1Click, so no size fails.
 
+[![Teller, live at teller-bridge.vercel.app](submission/01-hero.png)](https://teller-bridge.vercel.app)
+
+Live demo: https://teller-bridge.vercel.app. Deck: https://teller-bridge.vercel.app/deck/.
+
+<p><img src="submission/02-quote.png" alt="The swap card with a quote and the terms the wallet signs" width="49%"> <img src="submission/04-done.png" alt="The receipt strip after a completed swap, every leg with its explorer link" width="49%"></p>
+
+![One PUSD to USDC swap, step by step](submission/flow.png)
+
+![Contracts, desk service, wallets, chains and data sources](submission/architecture.png)
+
 ## What a judge gets in the first minute
 
 1. The card opens with two drawers, the PUSD drawer on Bitcoin Cash and the USDC drawer on Base, each showing the live balance, what open quotes have reserved, and "fills up to" under the amount box.
@@ -24,7 +34,7 @@ If anything stalls, both sides time out in the order that keeps the user whole: 
 
 | Rule | Where | Test that fails without it |
 |---|---|---|
-| Claim needs the 32-byte secret, pays exactly the recipient, one input, one output, full token amount, fee capped | `contracts/bch/SwapLock.cash` | `test/bch-contract.test.js`, 14 mutants killed |
+| Claim needs the 32-byte secret, pays exactly the recipient, one input, one output, full token amount, fee capped | `contracts/bch/SwapLock.cash` | `test/bch-contract.test.js`, 15 mutants killed |
 | Refund only after the timeout, pays exactly the refund address, same one-in one-out shape | same | same |
 | Claim pays the recipient whoever sends it, refund pays the sender and only from the timeout | `contracts/evm/src/DeskLock.sol` | `contracts/evm/test/DeskLock.t.sol`, 18 mutants killed |
 | The desk answers only with margin before the user's refund time, never double-locks, refunds and relays refunds | `desk/engine.js` | `test/desk.test.js`, every refund and timeout branch of both directions |
