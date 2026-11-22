@@ -2,7 +2,7 @@
 
 Atomic swaps between ParyonUSD (PUSD) and MUSD on Bitcoin Cash and USDC on Base, both directions, filled from a funded desk.
 
-The swap card shows what the desk can fill right now, per direction, read from the desk wallets. A swap up to that number is atomic: the user's coins sit in a hash-timelock on one chain, the desk's coins sit in a hash-timelock on the other, and one 32-byte secret opens both. Anything above it is quoted live through NEAR Intents 1Click, so no size fails.
+The swap card shows what the desk can fill right now, per direction, read from the desk wallets. A swap up to that number is atomic: the user's coins sit in a hash-timelock on one chain, the desk's coins sit in a hash-timelock on the other, and one 32-byte secret opens both. Anything above it is quoted live through NEAR Intents 1Click.
 
 [![Teller, live at teller-bridge.vercel.app](submission/01-hero.png)](https://teller-bridge.vercel.app)
 

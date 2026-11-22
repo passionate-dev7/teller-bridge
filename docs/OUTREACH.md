@@ -22,7 +22,7 @@ Offer: MUSD to USDC on Base with the same covenant and the same refund guarantee
 
 Subject: instant lane in front of 1Click
 
-Above the desk's inventory the Teller card quotes 1Click live (BCH to USDC on Base, with Cauldron for the PUSD leg), so no amount fails.
+Above the desk's inventory the Teller card quotes 1Click live (BCH to USDC on Base, with Cauldron for the PUSD leg).
 Ask: a partner JWT for the fee-free quote tier and a link from the BCH page to the desk as the instant lane for small PUSD swaps.
 Offer: the desk reports its live capacity per direction, so 1Click can route sub-capacity swaps to it.
 

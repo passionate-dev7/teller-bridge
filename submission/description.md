@@ -2,7 +2,7 @@
 
 **One secret opens two locks: PUSD and USDC swap atomically.**
 
-Teller swaps ParyonUSD (PUSD) or MUSD on Bitcoin Cash for USDC on Base, and back, against a desk that holds inventory on both chains. The user's coins sit in a hash-timelock on one chain, the desk's coins sit in a hash-timelock on the other, and one 32-byte secret opens both; a size above the desk's inventory is quoted live through NEAR Intents and Cauldron, so no amount fails.
+Teller swaps ParyonUSD (PUSD) or MUSD on Bitcoin Cash for USDC on Base, and back, against a desk that holds inventory on both chains. The user's coins sit in a hash-timelock on one chain, the desk's coins sit in a hash-timelock on the other, and one 32-byte secret opens both; a size above the desk's inventory is quoted live through NEAR Intents and Cauldron.
 
 Bounty track: Stablecoin Bridge. PUSD and MUSD on Bitcoin Cash to USDC on Base, both directions, WizardConnect and WalletConnect, NEAR Intents above desk capacity.
 
